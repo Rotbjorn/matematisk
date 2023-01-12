@@ -127,7 +127,7 @@ impl Lexer {
                 '}' => TokenType::RightBrace,
 
                 _ => {
-                    // Non handled character, raise up error
+                    // Non handled character, propagate error
                     return None
                 }
             }
