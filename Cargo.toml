@@ -1,0 +1,6 @@
+[workspace]
+
+members = [
+    "cas_lib",
+    "cas_bin"
+]
