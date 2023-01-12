@@ -65,21 +65,20 @@ impl Parser {
     }
 
     fn parse_number(&mut self) -> Node {
-        if let TokenType::Number(n) = self.cur_token.typ {
-            self.consume();
-            return Node::Number(n);
-        } else {
-            panic!("Shit");
-        }
+        let TokenType::Number(n) = self.cur_token.typ else {
+            panic!("shit");
+        };
+
+        self.consume();
+        return Node::Number(n)
     }
 
     fn parse_identifier(&mut self) -> Node {
-        if let TokenType::Identifier(s) = self.cur_token.typ.clone() {
-            self.consume();
-            return Node::Variable(s);
-        } else {
+        let TokenType::Identifier(s) = self.cur_token.typ.clone() else {
             panic!("Oh no.");
-        }
+        };
+        self.consume();
+        return Node::Variable(s);
     }
 
     fn parse_grouping(&mut self) -> Node {
@@ -190,7 +189,7 @@ enum Precedence {
 }
 
 
-// Place function at better place
+// TODO: Place function at better place
 fn token_precedence(typ: &TokenType) -> Precedence {
     use TokenType::*;
     use Precedence::*;
