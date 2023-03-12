@@ -12,12 +12,23 @@ pub struct Token {
 pub enum TokenType {
     Number(f64),
     Identifier(String),
+    Keyword(KeywordType),
 
     Plus,
     Minus,
     Star,
     Slash,
     Caret,
+
+    Equal,
+    EqualEqual,
+    Less,
+    Greater,
+    LessEqual,
+    GreaterEqual,
+
+    Colon,
+    Semicolon,
 
     LeftParenthesis,
     RightParenthesis,
@@ -26,7 +37,14 @@ pub enum TokenType {
     RightBrace,
     LeftBrace,
 
-    EndOfFile,
+    NewLine,
+    EndOfFile, // TODO: Check if not needed?!
+}
+
+#[derive(Debug, Clone)]
+pub enum KeywordType {
+    If,
+    Else,
 }
 
 impl Token {
