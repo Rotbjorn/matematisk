@@ -1,10 +1,13 @@
 use std::{io::Write, fs::File};
 
-use cas_lib::cas::{lexer::Lexer, parser::Parser, token::Token};
+use cas_lib::cas::{lexer::Lexer, parser::Parser, token::Token, node::{Node, OperationType}, simplify::combine_like_terms};
 
 
 fn main() {
+    //let mut test_node = Node::BinaryOp { left: Box::new(Node::BinaryOp { left: Box::new(Node::Number(2.0)), operation: OperationType::Multiply, right: Box::new(Node::Variable("x".to_string())) }), operation: OperationType::Multiply, right: Box::new(Node::Number(3.0)) };
+    //let (co, p) = combine_like_terms(&mut test_node);
     repl();
+    //println!("{:?}\n{}, -- {:?}", test_node, co, p)
 }
 
 fn repl() {
@@ -22,13 +25,19 @@ fn repl() {
         // TODO: Add proper command handling
         if buf.starts_with(":lex") {
             let expression = &buf[5..];
+
             for tok in Lexer::new(expression) {
                 println!("{:?}", tok);
             }
         } else if buf.starts_with(":parse") {
             let expression = &buf[7..];
             let tokens: Vec<Token> = Lexer::new(expression).collect();
-            let ast = Parser::new(tokens).parse();
+            let result = Parser::new(tokens).parse();
+            let Ok(ast) = result else {
+                let error = result.err().unwrap();
+                println!("{:?}", error);
+                continue;
+            };
             println!(" -- Abstract Syntax Tree --\n{:?}",ast);
             let mut graph_buf = String::new();
             ast.render_dot_graph_notation(&mut graph_buf);
