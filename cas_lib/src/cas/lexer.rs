@@ -1,7 +1,7 @@
 use core::panic;
 use crate::util::Position;
 
-use super::token::{Token, TokenType};
+use super::token::{Token, TokenType, KeywordType};
 
 #[derive(Debug)]
 pub struct Lexer {
@@ -34,7 +34,17 @@ impl Lexer {
 
             if ch.is_alphabetic() {
                 let identifier = self.collect_while(|c| c.is_alphabetic());
-                return Token::new(TokenType::Identifier(identifier), self.pos);
+                // TODO: Extract out from the next_token function, also change to something that allows for I18N?
+                let keyword_type = match identifier.as_str() {
+                    "if" => Some(KeywordType::If),
+                    "else" => Some(KeywordType::Else),
+                    _ => None
+                };
+                if let Some(keyword) = keyword_type {
+                    return Token::new(TokenType::Keyword(keyword), self.pos)
+                } else {
+                    return Token::new(TokenType::Identifier(identifier), self.pos);
+                }
             }
 
 
@@ -50,6 +60,8 @@ impl Lexer {
         }
     }
 
+
+    // TODO: Use something else
     fn collect_while(&mut self, predicate: fn(char) -> bool) -> String
     {
         let mut buffer = String::new();
@@ -73,7 +85,7 @@ impl Lexer {
     }
 
     fn skip_whitespace(&mut self) {
-        self.collect_while(|c| c == ' ' || c == '\n');
+        self.collect_while(|c| c == ' ' || c == '\t');
     }
 
     fn next_char(&mut self) -> Option<char> {
@@ -87,15 +99,13 @@ impl Lexer {
                 self.pos.row += 1;
                 self.pos.col = 0;
             }
-
-            return peeked_char;
-        } else {
-            None
-        }
+        } 
+        peeked_char
     }
 
     fn peek_char(&mut self) -> Option<char> {
         if !self.is_eof() {
+            // TODO: Change to something with iterators?
             let ch = self.input[self.idx];
             return Some(ch);
         } else {
@@ -119,6 +129,39 @@ impl Lexer {
                 '/' => TokenType::Slash,
                 '^' => TokenType::Caret,
 
+                '=' => {
+                    let mut token_type = TokenType::Equal;
+                    if let Some(next) = self.peek_char() {
+                        if next == '=' {
+                            token_type = TokenType::EqualEqual
+                        }
+                    }
+                    token_type
+                }
+                '<' => {
+                    let mut token_type = TokenType::Equal;
+                    if let Some(next) = self.peek_char() {
+                        if next == '=' {
+                            self.next_char();
+                            token_type = TokenType::EqualEqual
+                        }
+                    }
+                    token_type
+                }
+                '>' => {
+                    let mut token_type = TokenType::Equal;
+                    if let Some(next) = self.peek_char() {
+                        if next == '=' {
+                            self.next_char();
+                            token_type = TokenType::EqualEqual
+                        }
+                    }
+                    token_type
+                }
+
+                ':' => TokenType::Colon,
+                ';' => TokenType::Semicolon,
+
                 '(' => TokenType::LeftParenthesis,
                 ')' => TokenType::RightParenthesis,
                 '[' => TokenType::LeftSquareBracket,
@@ -126,6 +169,7 @@ impl Lexer {
                 '{' => TokenType::LeftBrace,
                 '}' => TokenType::RightBrace,
 
+                '\n' => TokenType::NewLine,
                 _ => {
                     // Non handled character, propagate error
                     return None
