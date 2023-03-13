@@ -1,7 +1,7 @@
-use core::panic;
 use crate::util::Position;
+use core::panic;
 
-use super::token::{Token, TokenType, KeywordType};
+use super::token::{KeywordType, Token, TokenType};
 
 #[derive(Debug)]
 pub struct Lexer {
@@ -9,7 +9,6 @@ pub struct Lexer {
     pub idx: usize,
     pub pos: Position,
 }
-
 
 impl Lexer {
     pub fn new(source: &str) -> Self {
@@ -26,8 +25,7 @@ impl Lexer {
         self.skip_whitespace();
 
         if let Some(ch) = self.peek_char() {
-
-            if ch.is_numeric(){
+            if ch.is_numeric() {
                 let number: f64 = self.collect_while(|c| c.is_numeric()).parse().unwrap();
                 return Token::new(TokenType::Number(number), self.pos);
             }
@@ -38,32 +36,30 @@ impl Lexer {
                 let keyword_type = match identifier.as_str() {
                     "if" => Some(KeywordType::If),
                     "else" => Some(KeywordType::Else),
-                    _ => None
+                    _ => None,
                 };
                 if let Some(keyword) = keyword_type {
-                    return Token::new(TokenType::Keyword(keyword), self.pos)
+                    return Token::new(TokenType::Keyword(keyword), self.pos);
                 } else {
                     return Token::new(TokenType::Identifier(identifier), self.pos);
                 }
             }
 
-
-
             if let Some(token) = self.special_char() {
-                return token
-            } 
-            panic!("Unhandled character: '{}', Code: {}, Idx: {}", ch, ch as usize, self.idx)
-
+                return token;
+            }
+            panic!(
+                "Unhandled character: '{}', Code: {}, Idx: {}",
+                ch, ch as usize, self.idx
+            )
         } else {
             // TODO: Change end of file to None?
             Token::new(TokenType::EndOfFile, self.pos)
         }
     }
 
-
     // TODO: Use something else
-    fn collect_while(&mut self, predicate: fn(char) -> bool) -> String
-    {
+    fn collect_while(&mut self, predicate: fn(char) -> bool) -> String {
         let mut buffer = String::new();
 
         loop {
@@ -99,7 +95,7 @@ impl Lexer {
                 self.pos.row += 1;
                 self.pos.col = 0;
             }
-        } 
+        }
         peeked_char
     }
 
@@ -121,9 +117,8 @@ impl Lexer {
     fn special_char(&mut self) -> Option<Token> {
         let token_type: TokenType;
         if let Some(ch) = self.next_char() {
-
             token_type = match ch {
-                '+' => TokenType::Plus, 
+                '+' => TokenType::Plus,
                 '-' => TokenType::Minus,
                 '*' => TokenType::Star,
                 '/' => TokenType::Slash,
@@ -172,7 +167,7 @@ impl Lexer {
                 '\n' => TokenType::NewLine,
                 _ => {
                     // Non handled character, propagate error
-                    return None
+                    return None;
                 }
             }
         } else {

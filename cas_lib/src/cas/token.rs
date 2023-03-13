@@ -1,6 +1,5 @@
 use crate::util::Position;
 
-
 #[derive(Debug, Clone)]
 pub struct Token {
     pub typ: TokenType,

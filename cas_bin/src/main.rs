@@ -1,4 +1,7 @@
-use std::{io::Write, fs::{File, self}};
+use std::{
+    fs::{self, File},
+    io::Write,
+};
 
 use cas_lib::cas::{lexer, parser, token::Token};
 use clap::{Parser, Subcommand};
@@ -9,18 +12,14 @@ struct Args {
     path: Option<std::path::PathBuf>,
     #[arg(short, long)]
     ast: Option<std::path::PathBuf>,
-
     //#[command(subcommand)]
     //command: Option<Commands>
 }
 
 #[derive(Subcommand)]
 enum Commands {
-    File {
-        path: Option<std::path::PathBuf>
-    }
+    File { path: Option<std::path::PathBuf> },
 }
-
 
 fn main() {
     let args = Args::parse();
@@ -40,7 +39,8 @@ fn main() {
             println!("Graph generated --- \n{}", graph_buf);
 
             let mut file = File::create(outfile_path).expect("Couldn't create file");
-            file.write(graph_buf.as_bytes()).expect("Couldn't write to dot file!");
+            file.write(graph_buf.as_bytes())
+                .expect("Couldn't write to dot file!");
         }
     } else {
         repl();
@@ -79,12 +79,13 @@ fn repl() {
                 println!("{:?}", error);
                 continue;
             };
-            println!(" -- Abstract Syntax Tree --\n{:?}",ast);
+            println!(" -- Abstract Syntax Tree --\n{:?}", ast);
             let mut graph_buf = String::new();
             ast.render_dot_graph_notation(&mut graph_buf);
             println!("Graph generated --- \n{}", graph_buf);
             let mut file = File::create("AST.dot").expect("Couldn't create file");
-            file.write(graph_buf.as_bytes()).expect("Couldn't write to dot file!");
+            file.write(graph_buf.as_bytes())
+                .expect("Couldn't write to dot file!");
         } else if buf.starts_with(":q") {
             break;
         }

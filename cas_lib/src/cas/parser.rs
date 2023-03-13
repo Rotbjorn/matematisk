@@ -86,8 +86,8 @@ impl Parser {
             TokenType::NewLine,
             "Expected newline after function definition.",
         ) {
-            Ok(_) => {},
-            _ => {},
+            Ok(_) => {}
+            _ => {}
         }
 
         Ok(Node::Function {

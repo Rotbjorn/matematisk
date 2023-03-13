@@ -1,6 +1,6 @@
-pub mod lexer;
-pub mod parser;
-pub mod token;
-pub mod node;
-pub mod simplify;
 pub mod error;
+pub mod lexer;
+pub mod node;
+pub mod parser;
+pub mod simplify;
+pub mod token;
