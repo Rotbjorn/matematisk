@@ -56,7 +56,7 @@ impl Lexer {
 
         } else {
             // TODO: Change end of file to None?
-            return Token::new(TokenType::EndOfFile, self.pos)
+            Token::new(TokenType::EndOfFile, self.pos)
         }
     }
 
@@ -107,10 +107,10 @@ impl Lexer {
         if !self.is_eof() {
             // TODO: Change to something with iterators?
             let ch = self.input[self.idx];
-            return Some(ch);
+            Some(ch)
         } else {
             // End of File
-            return None;
+            None
         }
     }
 
