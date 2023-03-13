@@ -7,3 +7,4 @@ edition = "2021"
 
 [dependencies]
 cas_lib = { path = "../cas_lib" }
+clap = { version = "4.1.8", features = ["derive"] }
