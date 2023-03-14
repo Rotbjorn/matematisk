@@ -1,8 +1,8 @@
-use crate::cas::error::ParseError;
+use crate::cas::{error::ParseError, node::Statement};
 use core::panic;
 
-use super::{
-    node::{Node, OperationType},
+use crate::cas::{
+    node::{Expr, OperationType},
     token::{Token, TokenType},
 };
 
@@ -25,11 +25,11 @@ impl Parser {
         }
     }
 
-    pub fn parse(&mut self) -> ParseResult<Node> {
-        let mut nodes: Vec<Node> = Vec::new();
+    pub fn parse(&mut self) -> ParseResult<Statement> {
+        let mut nodes: Vec<Statement> = Vec::new();
 
         loop {
-            let result = self.parse_statement();
+            let result = self.parse_declaration();
             match result {
                 Ok(node) => nodes.push(node),
                 Err(err) => match &err {
@@ -38,19 +38,26 @@ impl Parser {
                 },
             }
         }
-        Ok(Node::Program(nodes))
+        Ok(Statement::Program(nodes))
     }
 }
 
 impl Parser {
-    fn parse_statement(&mut self) -> ParseResult<Node> {
+    fn parse_declaration(&mut self) -> ParseResult<Statement> {
         match self.get_token()?.typ {
-            TokenType::Identifier(_) => return self.parse_function_possible(),
-            _ => self.parse_expression(),
+            TokenType::Identifier(_) => self.parse_function_possible(),
+            _ => self.parse_statement(),
+        }
+    }
+    fn parse_statement(&mut self) -> ParseResult<Statement> {
+        match self.get_token()? {
+            _ => {
+                Ok(Statement::Expression(self.parse_expression()?))
+            }
         }
     }
 
-    fn parse_function_possible(&mut self) -> ParseResult<Node> {
+    fn parse_function_possible(&mut self) -> ParseResult<Statement> {
         let TokenType::Identifier(name) = self.consume()?.typ else {
             return Err(
                 ParseError::WrongToken { message: "Expected identifier".to_string() }
@@ -82,17 +89,14 @@ impl Parser {
 
         let function_body = self.parse_expression()?;
 
-        match self.expect(
+        let _ = self.expect(
             TokenType::NewLine,
             "Expected newline after function definition.",
-        ) {
-            Ok(_) => {}
-            _ => {}
-        }
+        );
 
-        Ok(Node::Function {
+        Ok(Statement::Function {
             name,
-            function_body: Box::new(function_body),
+            function_body: function_body,
         })
     }
 
@@ -110,11 +114,11 @@ impl Parser {
         Ok((param_name, type_name))
     }
 
-    fn parse_expression(&mut self) -> ParseResult<Node> {
+    fn parse_expression(&mut self) -> ParseResult<Expr> {
         self.parse_precedence(Precedence::None)
     }
 
-    fn parse_precedence(&mut self, prec: Precedence) -> ParseResult<Node> {
+    fn parse_precedence(&mut self, prec: Precedence) -> ParseResult<Expr> {
         let token = self.get_token()?;
         let mut node = match token.typ {
             TokenType::Number(_) => self.parse_number()?,
@@ -122,16 +126,16 @@ impl Parser {
             TokenType::Keyword(_) => self.parse_keyword(),
             TokenType::Minus => todo!(),
             TokenType::LeftParenthesis => self.parse_grouping()?,
-            TokenType::LeftSquareBracket => todo!(),
-            TokenType::RightSquareBracket => todo!(),
-            TokenType::RightBrace => todo!(),
-            TokenType::LeftBrace => todo!(),
+            TokenType::LeftSquareBracket => todo!("Implement lists"),
+            TokenType::RightSquareBracket => todo!("Implement lists"),
+            TokenType::RightBrace => todo!("Implement blocks"),
+            TokenType::LeftBrace => todo!("Implement blocks"),
             _ => {
                 panic!("\nFailed prefix on: \n{:?}", token);
             }
         };
 
-        //println!("\nNode: {:?}\n", node);
+        //println!("\nExpr: {:?}\n", node);
         //println!("Current prec: {:?}", prec);
 
         while self.idx < self.tokens.len() && prec <= token_precedence(&self.get_token()?.typ) {
@@ -152,27 +156,27 @@ impl Parser {
         Ok(node)
     }
 
-    fn parse_number(&mut self) -> ParseResult<Node> {
+    fn parse_number(&mut self) -> ParseResult<Expr> {
         let TokenType::Number(n) = self.get_token()?.typ else {
             panic!("shit");
         };
 
         self.consume()?;
-        return Ok(Node::Number(n));
+        Ok(Expr::Number(n))
     }
 
-    fn parse_identifier(&mut self) -> ParseResult<Node> {
+    fn parse_identifier(&mut self) -> ParseResult<Expr> {
         let TokenType::Identifier(s) = self.consume()?.typ else {
             panic!("Oh no.");
         };
-        Ok(Node::Variable(s))
+        Ok(Expr::Variable(s))
     }
 
-    fn parse_keyword(&self) -> Node {
+    fn parse_keyword(&self) -> Expr {
         todo!()
     }
 
-    fn parse_grouping(&mut self) -> ParseResult<Node> {
+    fn parse_grouping(&mut self) -> ParseResult<Expr> {
         self.expect(TokenType::LeftParenthesis, "Expected opening parenthesis")?;
         let node = self.parse_expression()?;
         self.expect(TokenType::RightParenthesis, "Expected closing parenthesis")?;
@@ -180,10 +184,10 @@ impl Parser {
         Ok(node)
     }
 
-    fn parse_addition(&mut self, left: Node) -> ParseResult<Node> {
+    fn parse_addition(&mut self, left: Expr) -> ParseResult<Expr> {
         self.expect(TokenType::Plus, "Expected addition operator")?;
         let right = self.parse_precedence(Precedence::Factor)?;
-        let node = Node::BinaryOp {
+        let node = Expr::BinaryOp {
             left: left.into(),
             operation: OperationType::Add,
             right: right.into(),
@@ -191,16 +195,16 @@ impl Parser {
         Ok(node)
     }
 
-    fn parse_subtraction(&mut self, left: Node) -> ParseResult<Node> {
+    fn parse_subtraction(&mut self, left: Expr) -> ParseResult<Expr> {
         self.expect(TokenType::Minus, "Expected subtraction operator")?;
         let right = self.parse_precedence(Precedence::Factor)?;
-        let right_node = Node::BinaryOp {
-            left: (Node::Number(-1.0).into()),
+        let right_node = Expr::BinaryOp {
+            left: (Expr::Number(-1.0).into()),
             operation: OperationType::Multiply,
             right: (right.into()),
         };
 
-        let node = Node::BinaryOp {
+        let node = Expr::BinaryOp {
             left: left.into(),
             operation: OperationType::Add,
             right: right_node.into(),
@@ -208,10 +212,10 @@ impl Parser {
         Ok(node)
     }
 
-    fn parse_multiplication(&mut self, left: Node) -> ParseResult<Node> {
+    fn parse_multiplication(&mut self, left: Expr) -> ParseResult<Expr> {
         self.expect(TokenType::Star, "Expected multiplication operator")?;
         let right = self.parse_precedence(Precedence::Exponent)?;
-        let node = Node::BinaryOp {
+        let node = Expr::BinaryOp {
             left: left.into(),
             operation: OperationType::Multiply,
             right: right.into(),
@@ -219,16 +223,16 @@ impl Parser {
         Ok(node)
     }
 
-    fn parse_division(&mut self, left: Node) -> ParseResult<Node> {
+    fn parse_division(&mut self, left: Expr) -> ParseResult<Expr> {
         self.consume()?;
         let right = self.parse_precedence(Precedence::Factor)?;
-        let right_node = Node::BinaryOp {
+        let right_node = Expr::BinaryOp {
             left: right.into(),
             operation: OperationType::Power,
-            right: (Node::Number(-1.0).into()),
+            right: (Expr::Number(-1.0).into()),
         };
 
-        let node = Node::BinaryOp {
+        let node = Expr::BinaryOp {
             left: left.into(),
             operation: OperationType::Multiply,
             right: right_node.into(),
@@ -236,11 +240,11 @@ impl Parser {
         Ok(node)
     }
 
-    fn parse_power(&mut self, left: Node) -> ParseResult<Node> {
+    fn parse_power(&mut self, left: Expr) -> ParseResult<Expr> {
         // TODO: Something higher than Exponent?
         self.expect(TokenType::Caret, "Expected power operator")?;
         let right = self.parse_precedence(Precedence::Exponent)?;
-        let node = Node::BinaryOp {
+        let node = Expr::BinaryOp {
             left: left.into(),
             operation: OperationType::Power,
             right: right.into(),
@@ -272,10 +276,11 @@ impl Parser {
     // to signify a consume that shouldn't result in EndOfStream
     // I.E. in the middle of parsing something that is expected
     fn consume(&mut self) -> ParseResult<Token> {
+        let token = self.get_token()?;
+
         if self.idx < self.tokens.len() {
-            let opt_token = self.cur_token.clone();
             self.idx += 1;
-            println!("Consuming token: {:?}!", self.cur_token);
+            println!("consumed {}", token);
 
             // TODO: Change to something iterator-like to not have to do this???
             // Also use TokenType::EndOfFile???
@@ -284,9 +289,6 @@ impl Parser {
             } else {
                 self.cur_token = None
             }
-            let Some(token) = opt_token else {
-                panic!("NOOO");
-            };
             Ok(token)
         } else {
             self.cur_token = None;
@@ -315,10 +317,10 @@ enum Precedence {
 fn token_precedence(typ: &TokenType) -> Precedence {
     use Precedence::*;
     use TokenType::*;
-    return match typ {
+    match typ {
         Plus | Minus => Term,
         Star | Slash => Factor,
         Caret => Exponent,
         _ => None,
-    };
+    }
 }

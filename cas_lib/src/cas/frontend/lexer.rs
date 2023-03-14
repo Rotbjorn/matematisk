@@ -1,7 +1,7 @@
 use crate::util::Position;
 use core::panic;
 
-use super::token::{KeywordType, Token, TokenType};
+use crate::cas::token::{KeywordType, Token, TokenType};
 
 #[derive(Debug)]
 pub struct Lexer {
@@ -62,18 +62,11 @@ impl Lexer {
     fn collect_while(&mut self, predicate: fn(char) -> bool) -> String {
         let mut buffer = String::new();
 
-        loop {
-            if let Some(ch) = self.peek_char() {
-                if predicate(ch) {
-                    buffer.push(ch);
-                    // TODO: Use next_char()?
-                    self.next_char();
-                } else {
-                    // No longer fits the predicate
-                    break;
-                }
+        while let Some(ch) = self.peek_char() {
+            if predicate(ch) {
+                buffer.push(ch);
+                self.next_char();
             } else {
-                // End of File
                 break;
             }
         }
