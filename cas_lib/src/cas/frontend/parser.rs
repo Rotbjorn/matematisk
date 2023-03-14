@@ -51,9 +51,7 @@ impl Parser {
     }
     fn parse_statement(&mut self) -> ParseResult<Statement> {
         match self.get_token()? {
-            _ => {
-                Ok(Statement::Expression(self.parse_expression()?))
-            }
+            _ => Ok(Statement::Expression(self.parse_expression()?)),
         }
     }
 
@@ -96,7 +94,7 @@ impl Parser {
 
         Ok(Statement::Function {
             name,
-            function_body: function_body,
+            function_body,
         })
     }
 

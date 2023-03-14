@@ -60,7 +60,6 @@ impl PartialEq for TokenType {
     }
 }
 
-
 impl Display for Token {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_fmt(format_args!("{{ {:?}, {} }}", self.typ, self.pos))

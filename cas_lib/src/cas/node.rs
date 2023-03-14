@@ -13,14 +13,10 @@ pub enum Expr {
     },
 }
 
-
 #[derive(Debug, Clone)]
 pub enum Statement {
     Program(Vec<Statement>),
-    Function {
-        name: String,
-        function_body: Expr
-    },
+    Function { name: String, function_body: Expr },
     Expression(Expr),
 }
 
@@ -60,7 +56,7 @@ impl Statement {
                 out.push_str(format!("N_{} ->  N_{} \n", current_node_id, body_id).as_str());
             }
             Expression(ex) => {
-                let target_id = ex.render_dot_graph_notation_impl(out, count);
+                let _target_id = ex.render_dot_graph_notation_impl(out, count);
                 *count += 1;
             }
         }
