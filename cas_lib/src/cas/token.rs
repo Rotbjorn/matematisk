@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use crate::util::Position;
 
 #[derive(Debug, Clone)]
@@ -55,5 +57,12 @@ impl Token {
 impl PartialEq for TokenType {
     fn eq(&self, other: &Self) -> bool {
         core::mem::discriminant(self) == core::mem::discriminant(other)
+    }
+}
+
+
+impl Display for Token {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_fmt(format_args!("{{ {:?}, {} }}", self.typ, self.pos))
     }
 }
