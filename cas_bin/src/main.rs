@@ -3,7 +3,9 @@ use std::{
     io::Write,
 };
 
-use cas_lib::cas::{lexer, parser, token::Token};
+use cas_lib::cas::frontend::{lexer, parser};
+use cas_lib::cas::token::Token;
+
 use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
@@ -39,7 +41,7 @@ fn main() {
             println!("Graph generated --- \n{}", graph_buf);
 
             let mut file = File::create(outfile_path).expect("Couldn't create file");
-            file.write(graph_buf.as_bytes())
+            file.write_all(graph_buf.as_bytes())
                 .expect("Couldn't write to dot file!");
         }
     } else {
@@ -84,7 +86,7 @@ fn repl() {
             ast.render_dot_graph_notation(&mut graph_buf);
             println!("Graph generated --- \n{}", graph_buf);
             let mut file = File::create("AST.dot").expect("Couldn't create file");
-            file.write(graph_buf.as_bytes())
+            file.write_all(graph_buf.as_bytes())
                 .expect("Couldn't write to dot file!");
         } else if buf.starts_with(":q") {
             break;
