@@ -1,5 +1,4 @@
 use core::panic;
-use std::ops::Index;
 
 use matex_common::{
     error::ParseError,
