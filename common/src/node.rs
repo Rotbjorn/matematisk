@@ -1,3 +1,5 @@
+use crate::token::TokenType;
+
 
 #[derive(Debug, Clone)]
 pub enum Statement {
@@ -6,20 +8,6 @@ pub enum Statement {
     Expression(Expr),
 }
 
-#[derive(Debug, Clone)]
-pub enum Expr {
-    Number(f64),
-    Variable(String),
-
-    List(Vec<Expr>),
-
-    // TODO: Break into addition, multiply, power
-    BinaryOp {
-        left: Box<Expr>,
-        operation: OperationType,
-        right: Box<Expr>,
-    },
-}
 
 impl Statement {
     pub fn render_dot_graph_notation(&self, out: &mut String) {
@@ -69,11 +57,19 @@ impl Statement {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub enum OperationType {
-    Add,
-    Multiply,
-    Power,
+#[derive(Debug, Clone)]
+pub enum Expr {
+    Number(f64),
+    Variable(String),
+
+    List(Vec<Expr>),
+
+    // TODO: Break into addition, multiply, power
+    BinaryOp {
+        left: Box<Expr>,
+        operation: BinOp,
+        right: Box<Expr>,
+    },
 }
 
 impl Expr {
@@ -112,7 +108,7 @@ impl Expr {
                 let lhs_id = left.render_dot_graph_notation_impl(out, count);
                 let rhs_id = right.render_dot_graph_notation_impl(out, count);
 
-                if *operation == OperationType::Power {
+                if *operation == BinOp::Power {
                     out.push_str(
                         format!("N_{0} -> N_{1} [label = \"base\"]\nN_{0} -> N_{2} [label = \"exp\"]\n", current_node_id, lhs_id, rhs_id).as_str(),
                     );
@@ -126,4 +122,48 @@ impl Expr {
         }
         current_node_id
     }
+}
+
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum BinOp {
+    Add,
+    Subtract,
+    Multiply,
+    Divide,
+    Power,
+    None,
+}
+
+impl BinOp {
+    pub fn precedence(self) -> Precedence {
+        match self {
+            BinOp::Add | BinOp::Subtract => Precedence::Term,
+            BinOp::Multiply | BinOp::Divide => Precedence::Factor,
+            BinOp::Power => Precedence::Exponent,
+            _ => Precedence::None,
+        }
+    }
+}
+
+impl From<TokenType> for BinOp {
+    fn from(typ: TokenType) -> Self {
+        match typ {
+            TokenType::Plus => BinOp::Add,
+            TokenType::Minus => BinOp::Subtract,
+            TokenType::Star => BinOp::Multiply,
+            TokenType::Slash => BinOp::Divide,
+            TokenType::Caret => BinOp::Power,
+            _ => BinOp::None,
+        }
+    }
+}
+
+
+#[derive(PartialEq, PartialOrd, Debug)]
+pub enum Precedence {
+    None,
+    Term,
+    Factor,
+    Exponent,
 }

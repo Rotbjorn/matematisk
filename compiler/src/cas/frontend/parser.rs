@@ -1,6 +1,6 @@
 use core::panic;
 
-use matex_common::{error::ParseError, node::{Statement, Expr, OperationType}, token::{Token, TokenType}};
+use matex_common::{error::ParseError, node::{Statement, Expr, BinOp, Precedence}, token::{Token, TokenType}};
 
 type ParseResult<T> = std::result::Result<T, ParseError>;
 
@@ -132,7 +132,7 @@ impl Parser {
         //println!("\nExpr: {:?}\n", node);
         //println!("Current prec: {:?}", prec);
 
-        while self.idx < self.tokens.len() && prec <= token_precedence(&self.get_token()?.typ) {
+        while !self.at_end() && prec <= BinOp::from(self.get_token()?.typ).precedence() {
             node = match self.get_token()?.typ {
                 TokenType::Plus => self.parse_addition(node)?,
                 TokenType::Minus => self.parse_subtraction(node)?,
@@ -183,7 +183,7 @@ impl Parser {
         let right = self.parse_precedence(Precedence::Factor)?;
         let node = Expr::BinaryOp {
             left: left.into(),
-            operation: OperationType::Add,
+            operation: BinOp::Add,
             right: right.into(),
         };
         Ok(node)
@@ -194,13 +194,13 @@ impl Parser {
         let right = self.parse_precedence(Precedence::Factor)?;
         let right_node = Expr::BinaryOp {
             left: (Expr::Number(-1.0).into()),
-            operation: OperationType::Multiply,
+            operation: BinOp::Multiply,
             right: (right.into()),
         };
 
         let node = Expr::BinaryOp {
             left: left.into(),
-            operation: OperationType::Add,
+            operation: BinOp::Add,
             right: right_node.into(),
         };
         Ok(node)
@@ -211,7 +211,7 @@ impl Parser {
         let right = self.parse_precedence(Precedence::Exponent)?;
         let node = Expr::BinaryOp {
             left: left.into(),
-            operation: OperationType::Multiply,
+            operation: BinOp::Multiply,
             right: right.into(),
         };
         Ok(node)
@@ -222,13 +222,13 @@ impl Parser {
         let right = self.parse_precedence(Precedence::Factor)?;
         let right_node = Expr::BinaryOp {
             left: right.into(),
-            operation: OperationType::Power,
+            operation: BinOp::Power,
             right: (Expr::Number(-1.0).into()),
         };
 
         let node = Expr::BinaryOp {
             left: left.into(),
-            operation: OperationType::Multiply,
+            operation: BinOp::Multiply,
             right: right_node.into(),
         };
         Ok(node)
@@ -240,7 +240,7 @@ impl Parser {
         let right = self.parse_precedence(Precedence::Exponent)?;
         let node = Expr::BinaryOp {
             left: left.into(),
-            operation: OperationType::Power,
+            operation: BinOp::Power,
             right: right.into(),
         };
         Ok(node)
@@ -272,13 +272,13 @@ impl Parser {
     fn consume(&mut self) -> ParseResult<Token> {
         let token = self.get_token()?;
 
-        if self.idx < self.tokens.len() {
+        if !self.at_end() {
             self.idx += 1;
             println!("consumed {}", token);
 
             // TODO: Change to something iterator-like to not have to do this???
             // Also use TokenType::EndOfFile???
-            if self.idx < self.tokens.len() {
+            if !self.at_end() {
                 self.cur_token = Some(self.tokens[self.idx].clone());
             } else {
                 self.cur_token = None
@@ -297,24 +297,8 @@ impl Parser {
             Err(ParseError::EndOfStream)
         }
     }
-}
 
-#[derive(PartialEq, PartialOrd, Debug)]
-enum Precedence {
-    None,
-    Term,
-    Factor,
-    Exponent,
-}
-
-// TODO: Place function at better place
-fn token_precedence(typ: &TokenType) -> Precedence {
-    use Precedence::*;
-    use TokenType::*;
-    match typ {
-        Plus | Minus => Term,
-        Star | Slash => Factor,
-        Caret => Exponent,
-        _ => None,
+    fn at_end(&self) -> bool {
+        return self.idx >= self.tokens.len();
     }
 }
