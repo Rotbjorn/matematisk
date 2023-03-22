@@ -1,4 +1,4 @@
-use crate::{error::ParseError, token::TokenType};
+use crate::token::TokenType;
 
 #[derive(Debug, Clone)]
 pub enum Statement {
