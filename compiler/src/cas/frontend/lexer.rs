@@ -127,21 +127,21 @@ impl Lexer {
                     token_type
                 }
                 '<' => {
-                    let mut token_type = TokenType::Equal;
+                    let mut token_type = TokenType::Less;
                     if let Some(next) = self.peek_char() {
                         if next == '=' {
                             self.next_char();
-                            token_type = TokenType::EqualEqual
+                            token_type = TokenType::LessEqual
                         }
                     }
                     token_type
                 }
                 '>' => {
-                    let mut token_type = TokenType::Equal;
+                    let mut token_type = TokenType::Greater;
                     if let Some(next) = self.peek_char() {
                         if next == '=' {
                             self.next_char();
-                            token_type = TokenType::EqualEqual
+                            token_type = TokenType::GreaterEqual
                         }
                     }
                     token_type
@@ -149,6 +149,9 @@ impl Lexer {
 
                 ':' => TokenType::Colon,
                 ';' => TokenType::Semicolon,
+
+                '.' => TokenType::Dot,
+                ',' => TokenType::Comma,
 
                 '(' => TokenType::LeftParenthesis,
                 ')' => TokenType::RightParenthesis,

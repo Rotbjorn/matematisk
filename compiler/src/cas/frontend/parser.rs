@@ -1,6 +1,11 @@
 use core::panic;
+use std::ops::Index;
 
-use matex_common::{error::ParseError, node::{Statement, Expr, BinOp, Precedence}, token::{Token, TokenType}};
+use matex_common::{
+    error::ParseError,
+    node::{BinOp, Expr, Precedence, Statement},
+    token::{KeywordType, Token, TokenType},
+};
 
 type ParseResult<T> = std::result::Result<T, ParseError>;
 
@@ -40,8 +45,10 @@ impl Parser {
 
 impl Parser {
     fn parse_declaration(&mut self) -> ParseResult<Statement> {
+        self.consume_newlines()?;
+
         match self.get_token()?.typ {
-            TokenType::Identifier(_) => self.parse_function_possible(),
+            TokenType::Identifier(id) => self.parse_function_possible(id),
             _ => self.parse_statement(),
         }
     }
@@ -51,17 +58,17 @@ impl Parser {
         }
     }
 
-    fn parse_function_possible(&mut self) -> ParseResult<Statement> {
-        let TokenType::Identifier(name) = self.consume()?.typ else {
-            return Err(
-                ParseError::WrongToken { message: "Expected identifier".to_string() }
-            )
+    fn parse_function_possible(&mut self, id: String) -> ParseResult<Statement> {
+        let Some(next_token) = self.peek(1) else {
+            return self.parse_statement();
         };
 
+        let name = id;
         // TODO: Might not be function definition, could just be function call. Check/peek for TokenType::Equal after
         // matching parenthesis: abs(....(...)) =
         //                          ^---------^ Match this one
-        if self.get_token()?.typ == TokenType::LeftParenthesis {
+        if next_token.typ == TokenType::LeftParenthesis {
+            self.expect_identifier("Expected function name")?;
             // Function!
             // parse parameters
             self.expect(
@@ -79,6 +86,8 @@ impl Parser {
                 TokenType::Equal,
                 "Expected assignment operator after function definition...",
             );
+        } else {
+            return self.parse_statement();
         }
 
         let function_body = self.parse_expression()?;
@@ -116,8 +125,8 @@ impl Parser {
         let token = self.get_token()?;
         let mut node = match token.typ {
             TokenType::Number(_) => self.parse_number()?,
-            TokenType::Identifier(_) => self.parse_identifier()?,
-            TokenType::Keyword(_) => self.parse_keyword(),
+            TokenType::Identifier(id) => self.parse_identifier(id)?,
+            TokenType::Keyword(kw) => self.parse_keyword(kw)?,
             TokenType::Minus => todo!(),
             TokenType::LeftParenthesis => self.parse_grouping()?,
             TokenType::LeftSquareBracket => todo!("Implement lists"),
@@ -129,9 +138,15 @@ impl Parser {
             }
         };
 
-        //println!("\nExpr: {:?}\n", node);
+        println!("\nExpr: {:?}\n", node);
         //println!("Current prec: {:?}", prec);
 
+        println!(
+            "Prec: {:?},\nCurrent Token: {},\nToken Precedence: {:?}\n",
+            prec,
+            self.get_token()?,
+            BinOp::from(self.get_token()?.typ).precedence()
+        );
         while !self.at_end() && prec <= BinOp::from(self.get_token()?.typ).precedence() {
             node = match self.get_token()?.typ {
                 TokenType::Plus => self.parse_addition(node)?,
@@ -139,6 +154,11 @@ impl Parser {
                 TokenType::Star => self.parse_multiplication(node)?,
                 TokenType::Slash => self.parse_division(node)?,
                 TokenType::Caret => self.parse_power(node)?,
+                TokenType::Less
+                | TokenType::LessEqual
+                | TokenType::Greater
+                | TokenType::GreaterEqual => self.parse_comparison(node)?,
+                TokenType::Equal => self.parse_assignment(node)?,
                 _ => {
                     break;
                 }
@@ -159,15 +179,72 @@ impl Parser {
         Ok(Expr::Number(n))
     }
 
-    fn parse_identifier(&mut self) -> ParseResult<Expr> {
-        let TokenType::Identifier(s) = self.consume()?.typ else {
-            panic!("Oh no.");
-        };
-        Ok(Expr::Variable(s))
+    fn parse_identifier(&mut self, id: String) -> ParseResult<Expr> {
+        self.expect_identifier("Expected identifier.")?;
+        if self.get_token()?.typ == TokenType::LeftParenthesis {
+            // Assume function call
+            return self.parse_function_call(id);
+        }
+        Ok(Expr::Variable(id))
     }
 
-    fn parse_keyword(&self) -> Expr {
-        todo!()
+    fn parse_keyword(&mut self, kw: KeywordType) -> ParseResult<Expr> {
+        // Expect Keyword type ideally....
+        self.consume()?;
+
+        let expr = match kw {
+            KeywordType::If => self.parse_if()?,
+            KeywordType::Else => todo!(),
+        };
+
+        Ok(expr)
+    }
+
+    fn parse_if(&mut self) -> ParseResult<Expr> {
+        let condition = Box::new(self.parse_expression()?);
+
+        let body = Box::new(self.parse_expression()?);
+
+        self.expect_keyword(KeywordType::Else, "Expected else after if body.")?;
+
+        let else_body = Box::new(self.parse_expression()?);
+
+        Ok(Expr::If {
+            condition,
+            body,
+            else_body,
+        })
+    }
+
+    fn parse_function_call(&mut self, id: String) -> ParseResult<Expr> {
+        self.expect(
+            TokenType::LeftParenthesis,
+            "Expected parenthesis after function name",
+        )?;
+
+        if self.get_token()?.typ == TokenType::RightParenthesis {
+            // No arguments passed,
+            return Ok(Expr::FunctionCall {
+                name: id,
+                args: vec![],
+            });
+        }
+
+        // Create argument vector, and store first argument.
+        let mut args: Vec<Expr> = vec![self.parse_expression()?];
+
+        // Parse arguments
+        while self.get_token()?.typ == TokenType::Comma {
+            self.expect(TokenType::Comma, "Expected comma after argument")?;
+            let argument = self.parse_expression()?;
+            args.push(argument);
+        }
+        self.expect(
+            TokenType::RightParenthesis,
+            "Expected parenthesis after arguments of function call",
+        )?;
+
+        Ok(Expr::FunctionCall { name: id, args })
     }
 
     fn parse_grouping(&mut self) -> ParseResult<Expr> {
@@ -219,7 +296,7 @@ impl Parser {
 
     fn parse_division(&mut self, left: Expr) -> ParseResult<Expr> {
         self.consume()?;
-        let right = self.parse_precedence(Precedence::Factor)?;
+        let right = self.parse_precedence(Precedence::Exponent)?;
         let right_node = Expr::BinaryOp {
             left: right.into(),
             operation: BinOp::Power,
@@ -239,13 +316,50 @@ impl Parser {
         self.expect(TokenType::Caret, "Expected power operator")?;
         let right = self.parse_precedence(Precedence::Exponent)?;
         let node = Expr::BinaryOp {
-            left: left.into(),
+            left: Box::new(left),
             operation: BinOp::Power,
-            right: right.into(),
+            right: Box::new(right),
         };
         Ok(node)
     }
 
+    fn parse_comparison(&mut self, left: Expr) -> ParseResult<Expr> {
+        let operation = BinOp::from(self.get_token()?.typ);
+        self.consume()?;
+
+        // Support custom infix operators?
+        if operation == BinOp::None {
+            return Err(ParseError::WrongToken {
+                message: "Expected a binary operation...".to_string(),
+            });
+        }
+
+        let right = self.parse_precedence(Precedence::Term)?;
+
+        Ok(Expr::BinaryOp {
+            left: Box::new(left),
+            operation,
+            right: Box::new(right),
+        })
+    }
+
+    fn parse_assignment(&mut self, holder: Expr) -> ParseResult<Expr> {
+        dbg!("parse_assignment");
+        self.expect(
+            TokenType::Equal,
+            "Expected assignment operator after variable name.",
+        )?;
+
+        let value = self.parse_expression()?;
+
+        Ok(Expr::Assignment {
+            holder: Box::new(holder),
+            value: Box::new(value),
+        })
+    }
+}
+
+impl Parser {
     fn expect(&mut self, tok: TokenType, message: &str) -> ParseResult<Token> {
         let token = self.get_token()?;
         if token.typ != tok {
@@ -262,6 +376,26 @@ impl Parser {
                 message: format!("Expected an identifier: {:?}\n{}", token.typ, message)
             });
         };
+        self.consume()?;
+        Ok(token)
+    }
+
+    fn expect_keyword(&mut self, expected_kw: KeywordType, message: &str) -> ParseResult<Token> {
+        let token = self.get_token()?;
+        let TokenType::Keyword(kw) = &token.typ else {
+            return Err(ParseError::WrongToken  {
+                message: format!("Expected a keyword: {:?}\n{}", token.typ, message)
+            });
+        };
+
+        if *kw != expected_kw {
+            return Err(ParseError::WrongToken {
+                message: format!(
+                    "Expected a keyword of type {:?}:\n got: {:?}\n{}",
+                    expected_kw, kw, message
+                ),
+            });
+        }
         self.consume()?;
         Ok(token)
     }
@@ -290,6 +424,13 @@ impl Parser {
         }
     }
 
+    fn consume_newlines(&mut self) -> ParseResult<()> {
+        while self.get_token()?.typ == TokenType::NewLine {
+            self.consume()?;
+        }
+        Ok(())
+    }
+
     fn get_token(&self) -> ParseResult<Token> {
         if let Some(token) = self.cur_token.clone() {
             Ok(token)
@@ -298,7 +439,16 @@ impl Parser {
         }
     }
 
+    fn peek(&self, offset: i32) -> Option<Token> {
+        let index = self.idx as i32 + offset;
+        if index < self.tokens.len() as i32 && index >= 0 {
+            return Some(self.tokens[index as usize].clone());
+        } else {
+            return None;
+        }
+    }
+
     fn at_end(&self) -> bool {
-        return self.idx >= self.tokens.len();
+        self.idx >= self.tokens.len()
     }
 }

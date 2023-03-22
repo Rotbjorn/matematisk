@@ -31,6 +31,9 @@ pub enum TokenType {
     Colon,
     Semicolon,
 
+    Dot,
+    Comma,
+
     LeftParenthesis,
     RightParenthesis,
     LeftSquareBracket,
@@ -42,7 +45,7 @@ pub enum TokenType {
     EndOfFile, // TODO: Check if not needed?!
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum KeywordType {
     If,
     Else,

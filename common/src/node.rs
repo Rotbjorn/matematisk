@@ -1,5 +1,4 @@
-use crate::token::TokenType;
-
+use crate::{error::ParseError, token::TokenType};
 
 #[derive(Debug, Clone)]
 pub enum Statement {
@@ -7,7 +6,6 @@ pub enum Statement {
     Function { name: String, function_body: Expr },
     Expression(Expr),
 }
-
 
 impl Statement {
     pub fn render_dot_graph_notation(&self, out: &mut String) {
@@ -29,10 +27,14 @@ impl Statement {
                 out.push_str(format!("N_{} [label = \"<>\"]\n", current_node_id).as_str());
                 *count += 1;
                 for (index, node) in v.iter().enumerate() {
-                    out.push_str(format!("S_{0} [label = \"{0}\"]\n", index).as_str());
-                    out.push_str(format!("N_{} -> S_{}\n", current_node_id, index).as_str());
                     let target_id = node.render_dot_graph_notation_impl(out, count);
-                    out.push_str(format!("S_{} -> N_{}\n", index, target_id).as_str());
+                    out.push_str(
+                        format!(
+                            "N_{} -> N_{} [label = \"{}\"]\n",
+                            current_node_id, target_id, index
+                        )
+                        .as_str(),
+                    );
                 }
             }
             Function {
@@ -69,6 +71,22 @@ pub enum Expr {
         left: Box<Expr>,
         operation: BinOp,
         right: Box<Expr>,
+    },
+
+    Assignment {
+        holder: Box<Expr>,
+        value: Box<Expr>,
+    },
+
+    If {
+        condition: Box<Expr>,
+        body: Box<Expr>,
+        else_body: Box<Expr>,
+    },
+
+    FunctionCall {
+        name: String,
+        args: Vec<Expr>,
     },
 }
 
@@ -110,12 +128,77 @@ impl Expr {
 
                 if *operation == BinOp::Power {
                     out.push_str(
-                        format!("N_{0} -> N_{1} [label = \"base\"]\nN_{0} -> N_{2} [label = \"exp\"]\n", current_node_id, lhs_id, rhs_id).as_str(),
+                        format!(
+                            "N_{0} -> N_{1} [label = \"base\"]\nN_{0} -> N_{2} [label = \"exp\"]\n",
+                            current_node_id, lhs_id, rhs_id
+                        )
+                        .as_str(),
                     );
                 } else {
-
                     out.push_str(
-                        format!("N_{} -> {{ N_{} N_{} }}\n", current_node_id, lhs_id, rhs_id).as_str(),
+                        format!(
+                            "N_{0} -> N_{1} [label = \"lhs\"]\nN_{0} -> N_{2} [label = \"rhs\"]\n",
+                            current_node_id, lhs_id, rhs_id
+                        )
+                        .as_str(),
+                    );
+                }
+            }
+
+            Assignment { holder, value } => {
+                out.push_str(format!("N_{} [label = \"Assignment\"]\n", current_node_id).as_str());
+                *count += 1;
+
+                let holder_id = holder.render_dot_graph_notation_impl(out, count);
+                let value_id = value.render_dot_graph_notation_impl(out, count);
+
+                out.push_str(
+                    format!(
+                        "N_{0} -> N_{1} [label = \"holder\"]\nN_{0} -> N_{2} [label = \"value\"]\n",
+                        current_node_id, holder_id, value_id
+                    )
+                    .as_str(),
+                );
+            }
+
+            If {
+                condition,
+                body,
+                else_body,
+            } => {
+                out.push_str(format!("N_{} [label = \"if\"]\n", current_node_id).as_str());
+                *count += 1;
+
+                let condition_id = condition.render_dot_graph_notation_impl(out, count);
+                let body = body.render_dot_graph_notation_impl(out, count);
+                let else_body = else_body.render_dot_graph_notation_impl(out, count);
+
+                out.push_str(format!("N_{} -> N_{}\n", current_node_id, condition_id).as_str());
+
+                out.push_str(
+                    format!("N_{} -> N_{} [label = \"truthy\"]\n", condition_id, body).as_str(),
+                );
+                out.push_str(
+                    format!(
+                        "N_{} -> N_{} [label = \"falsy\"]\n",
+                        condition_id, else_body
+                    )
+                    .as_str(),
+                );
+            }
+            FunctionCall { name, args } => {
+                out.push_str(
+                    format!("N_{} [label = \"func_call: {}\"]\n", current_node_id, name).as_str(),
+                );
+                *count += 1;
+                for (index, node) in args.iter().enumerate() {
+                    let target_id = node.render_dot_graph_notation_impl(out, count);
+                    out.push_str(
+                        format!(
+                            "N_{} -> N_{} [label = \"{}\"]\n",
+                            current_node_id, target_id, index
+                        )
+                        .as_str(),
                     );
                 }
             }
@@ -124,7 +207,6 @@ impl Expr {
     }
 }
 
-
 #[derive(Debug, Clone, PartialEq)]
 pub enum BinOp {
     Add,
@@ -132,6 +214,14 @@ pub enum BinOp {
     Multiply,
     Divide,
     Power,
+
+    Less,
+    LessEqual,
+    Greater,
+    GreaterEqual,
+
+    Assignment,
+
     None,
 }
 
@@ -141,28 +231,40 @@ impl BinOp {
             BinOp::Add | BinOp::Subtract => Precedence::Term,
             BinOp::Multiply | BinOp::Divide => Precedence::Factor,
             BinOp::Power => Precedence::Exponent,
-            _ => Precedence::None,
+
+            BinOp::Less | BinOp::LessEqual | BinOp::Greater | BinOp::GreaterEqual => {
+                Precedence::Comparison
+            }
+
+            BinOp::Assignment => Precedence::Assignment,
+
+            BinOp::None => Precedence::None,
         }
     }
 }
 
 impl From<TokenType> for BinOp {
-    fn from(typ: TokenType) -> Self {
-        match typ {
+    fn from(value: TokenType) -> Self {
+        match value {
             TokenType::Plus => BinOp::Add,
             TokenType::Minus => BinOp::Subtract,
             TokenType::Star => BinOp::Multiply,
             TokenType::Slash => BinOp::Divide,
             TokenType::Caret => BinOp::Power,
+            TokenType::Less => BinOp::Less,
+            TokenType::LessEqual => BinOp::LessEqual,
+            TokenType::Greater => BinOp::Greater,
+            TokenType::GreaterEqual => BinOp::GreaterEqual,
             _ => BinOp::None,
         }
     }
 }
 
-
 #[derive(PartialEq, PartialOrd, Debug)]
 pub enum Precedence {
     None,
+    Assignment,
+    Comparison,
     Term,
     Factor,
     Exponent,
