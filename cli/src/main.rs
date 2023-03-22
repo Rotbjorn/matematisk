@@ -3,8 +3,8 @@ use std::{
     io::Write,
 };
 
-use matex_compiler::cas::frontend::{lexer, parser};
 use matex_common::token::Token;
+use matex_compiler::cas::frontend::{lexer, parser};
 
 use clap::{Parser, Subcommand};
 
