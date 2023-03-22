@@ -1,7 +1,7 @@
-use crate::util::Position;
 use core::panic;
 
-use crate::cas::token::{KeywordType, Token, TokenType};
+use matex_common::token::{KeywordType, Token, TokenType};
+use matex_common::util::Position;
 
 #[derive(Debug)]
 pub struct Lexer {

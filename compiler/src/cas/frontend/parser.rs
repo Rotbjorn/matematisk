@@ -1,10 +1,6 @@
-use crate::cas::{error::ParseError, node::Statement};
 use core::panic;
 
-use crate::cas::{
-    node::{Expr, OperationType},
-    token::{Token, TokenType},
-};
+use matex_common::{error::ParseError, node::{Statement, Expr, OperationType}, token::{Token, TokenType}};
 
 type ParseResult<T> = std::result::Result<T, ParseError>;
 

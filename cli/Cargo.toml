@@ -1,8 +1,11 @@
 [package]
-name = "cas_lib"
+name = "matex-cli"
 version = "0.1.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+matex-compiler = { path = "../compiler" }
+matex-common = { path = "../common" }
+clap = { version = "4.1.8", features = ["derive"] }

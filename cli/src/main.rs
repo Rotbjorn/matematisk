@@ -3,8 +3,8 @@ use std::{
     io::Write,
 };
 
-use cas_lib::cas::frontend::{lexer, parser};
-use cas_lib::cas::token::Token;
+use matex_compiler::cas::frontend::{lexer, parser};
+use matex_common::token::Token;
 
 use clap::{Parser, Subcommand};
 

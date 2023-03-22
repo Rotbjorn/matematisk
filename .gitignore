@@ -1,4 +1,4 @@
 /target
-AST.dot
-AST.svg
 /.vscode
+*.dot
+*.svg

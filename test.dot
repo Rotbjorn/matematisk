@@ -1,5 +1,8 @@
 digraph AST {
 label = "Abstract Syntax Tree"
+fontname = "Arial"
+node [fontname = "Arial"]
+edge [fontname = "Arial"]
 N_0 [label = "<>"]
 S_0 [label = "0"]
 N_0 -> S_0
@@ -25,7 +28,8 @@ N_12 [label = "num: 2"]
 N_13 [label = "num: 3"]
 N_11 -> { N_12 N_13 }
 N_14 [label = "num: 5"]
-N_10 -> { N_11 N_14 }
+N_10 -> N_11 [label = "base"]
+N_10 -> N_14 [label = "exp"]
 N_9 ->  N_10 
 S_1 -> N_9
 }

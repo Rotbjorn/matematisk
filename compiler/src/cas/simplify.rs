@@ -1,8 +1,8 @@
-use super::node::{Node, OperationType};
+use matex_common::node::{Expr, OperationType};
 
-pub fn combine_like_terms(expression: &mut Node) -> (f64, Node) {
+pub fn combine_like_terms(expression: &mut Expr) -> (f64, Expr) {
     let (coefficient, product) = match expression {
-        Node::BinaryOp {
+        Expr::BinaryOp {
             left,
             operation,
             right,
@@ -11,19 +11,19 @@ pub fn combine_like_terms(expression: &mut Node) -> (f64, Node) {
             let (rhs_coefficient, rhs_product) = combine_like_terms(right);
             (
                 lhs_coefficient * rhs_coefficient,
-                Node::BinaryOp {
+                Expr::BinaryOp {
                     left: Box::new(lhs_product),
                     operation: OperationType::Multiply,
                     right: Box::new(rhs_product),
                 },
             )
         }
-        Node::Number(n) => (*n, expression.clone()),
+        Expr::Number(n) => (*n, expression.clone()),
         _ => (1.0, expression.clone()),
     };
     println!("Test: {} -> {:?}", coefficient, product);
-    //    if let Node::Variable(var) = product {
-    //        (coefficient, Node::BinaryOp { left: Box::new(Node::Number(coefficient.into())), operation: OperationType::Multiply, right: Box::new(Node::Variable(var)) } )
+    //    if let Expr::Variable(var) = product {
+    //        (coefficient, Expr::BinaryOp { left: Box::new(Expr::Number(coefficient.into())), operation: OperationType::Multiply, right: Box::new(Expr::Variable(var)) } )
     //    } else {
     //        (coefficient, product)
     //    }
@@ -32,8 +32,8 @@ pub fn combine_like_terms(expression: &mut Node) -> (f64, Node) {
     } else {
         (
             coefficient,
-            Node::BinaryOp {
-                left: Box::new(Node::Number(coefficient)),
+            Expr::BinaryOp {
+                left: Box::new(Expr::Number(coefficient)),
                 operation: OperationType::Multiply,
                 right: Box::new(product),
             },
