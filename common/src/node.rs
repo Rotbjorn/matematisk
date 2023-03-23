@@ -1,3 +1,5 @@
+use std::thread::current;
+
 use crate::token::TokenType;
 
 #[derive(Debug, Clone)]
@@ -173,15 +175,21 @@ impl Expr {
                 let body = body.render_dot_graph_notation_impl(out, count);
                 let else_body = else_body.render_dot_graph_notation_impl(out, count);
 
-                out.push_str(format!("N_{} -> N_{}\n", current_node_id, condition_id).as_str());
+                out.push_str(
+                    format!(
+                        "N_{} -> N_{} [label = \"condition\"]\n",
+                        current_node_id, condition_id
+                    )
+                    .as_str(),
+                );
 
                 out.push_str(
-                    format!("N_{} -> N_{} [label = \"truthy\"]\n", condition_id, body).as_str(),
+                    format!("N_{} -> N_{} [label = \"truthy\"]\n", current_node_id, body).as_str(),
                 );
                 out.push_str(
                     format!(
                         "N_{} -> N_{} [label = \"falsy\"]\n",
-                        condition_id, else_body
+                        current_node_id, else_body
                     )
                     .as_str(),
                 );
