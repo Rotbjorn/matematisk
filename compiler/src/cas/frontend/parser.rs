@@ -441,9 +441,9 @@ impl Parser {
     fn peek(&self, offset: i32) -> Option<Token> {
         let index = self.idx as i32 + offset;
         if index < self.tokens.len() as i32 && index >= 0 {
-            return Some(self.tokens[index as usize].clone());
+            Some(self.tokens[index as usize].clone())
         } else {
-            return None;
+            None
         }
     }
 

@@ -4,7 +4,7 @@ use std::{
 };
 
 use matex_common::token::Token;
-use matex_compiler::cas::frontend::{lexer, parser};
+use matex_compiler::cas::{frontend::{lexer, parser}, backend::{runtime::RuntimeVisitor, visit::Visitor}};
 
 use clap::{Parser, Subcommand};
 
@@ -44,6 +44,11 @@ fn main() {
             file.write_all(graph_buf.as_bytes())
                 .expect("Couldn't write to dot file!");
         }
+
+        let mut runtime = RuntimeVisitor::default();
+        let exit_value = runtime.visit_statement(&ast);
+
+        println!("EXIT VALUE: {:?}", exit_value);
     } else {
         repl();
     }

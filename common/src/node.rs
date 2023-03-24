@@ -1,10 +1,10 @@
-use std::thread::current;
-
 use crate::token::TokenType;
+
+type Statements = Vec<Statement>;
 
 #[derive(Debug, Clone)]
 pub enum Statement {
-    Program(Vec<Statement>),
+    Program(Statements),
     Function { name: String, function_body: Expr },
     Expression(Expr),
 }
