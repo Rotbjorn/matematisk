@@ -6,7 +6,7 @@ use std::{
 
 use matex_common::node::{ASTGraphGenerator, Visitor};
 use matex_compiler::cas::{
-    backend::{runtime::RuntimeVisitor},
+    backend::runtime::RuntimeVisitor,
     frontend::{lexer, parser},
 };
 
@@ -36,9 +36,9 @@ fn main() {
 
         let contents = read_file.unwrap_or_else(|e| {
             let error = match e.kind() {
-                ErrorKind::NotFound => format!("File {:?} not found.", path).to_string(),
+                ErrorKind::NotFound => format!("File {:?} not found.", path),
                 ErrorKind::PermissionDenied => {
-                    format!("Couldn't read '{:?}': No permissions.", path).to_string()
+                    format!("Couldn't read '{:?}': No permissions.", path)
                 }
                 _ => "Other error".to_string(),
             };
@@ -63,7 +63,9 @@ fn main() {
         if let Some(outfile_path) = args.ast {
             let mut graph_buf = String::new();
 
-            ASTGraphGenerator::new(&mut graph_buf).create_dot_graph(&ast).expect("Failed to create graph");
+            ASTGraphGenerator::new(&mut graph_buf)
+                .create_dot_graph(&ast)
+                .expect("Failed to create graph");
 
             println!("Graph generated --- \n{}", graph_buf);
 
