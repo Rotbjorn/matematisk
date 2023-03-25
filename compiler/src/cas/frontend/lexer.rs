@@ -1,5 +1,3 @@
-use core::panic;
-
 use matex_common::token::{KeywordType, Token, TokenType};
 use matex_common::util::Position;
 
@@ -21,41 +19,41 @@ impl Lexer {
 }
 
 impl Lexer {
-    pub fn next_token(&mut self) -> Token {
+    pub fn next_token(&mut self) -> Option<Token> {
         self.skip_whitespace();
 
-        if let Some(ch) = self.peek_char() {
-            if ch.is_numeric() {
-                let number: f64 = self.collect_while(|c| c.is_numeric()).parse().unwrap();
-                return Token::new(TokenType::Number(number), self.pos);
-            }
+        let Some(ch) = self.peek_char() else {
+            return None;
+        };
 
-            if ch.is_alphabetic() {
-                let identifier = self.collect_while(|c| c.is_alphabetic());
-                // TODO: Extract out from the next_token function, also change to something that allows for I18N?
-                let keyword_type = match identifier.as_str() {
-                    "if" => Some(KeywordType::If),
-                    "else" => Some(KeywordType::Else),
-                    _ => None,
-                };
-                if let Some(keyword) = keyword_type {
-                    return Token::new(TokenType::Keyword(keyword), self.pos);
-                } else {
-                    return Token::new(TokenType::Identifier(identifier), self.pos);
-                }
-            }
-
-            if let Some(token) = self.special_char() {
-                return token;
-            }
-            panic!(
-                "Unhandled character: '{}', Code: {}, Idx: {}",
-                ch, ch as usize, self.idx
-            )
-        } else {
-            // TODO: Change end of file to None?
-            Token::new(TokenType::EndOfFile, self.pos)
+        if ch.is_numeric() {
+            let number: f64 = self.collect_while(|c| c.is_numeric()).parse().unwrap();
+            return Some(Token::new(TokenType::Number(number), self.pos));
         }
+
+        if ch.is_alphabetic() {
+            let identifier = self.collect_while(|c| c.is_alphabetic());
+            // TODO: Extract out from the next_token function, also change to something that allows for I18N?
+            let keyword_type = match identifier.as_str() {
+                "if" => Some(KeywordType::If),
+                "else" => Some(KeywordType::Else),
+                _ => None,
+            };
+            if let Some(keyword) = keyword_type {
+                return Some(Token::new(TokenType::Keyword(keyword), self.pos));
+            } else {
+                return Some(Token::new(TokenType::Identifier(identifier), self.pos));
+            }
+        }
+
+        if let Some(token) = self.special_char() {
+            return Some(token);
+        }
+        eprintln!(
+            "Unhandled character: '{}', Code: {}, Idx: {}",
+            ch, ch as usize, self.idx
+        );
+        None
     }
 
     // TODO: Use something else
@@ -108,68 +106,67 @@ impl Lexer {
     }
 
     fn special_char(&mut self) -> Option<Token> {
-        let token_type: TokenType;
-        if let Some(ch) = self.next_char() {
-            token_type = match ch {
-                '+' => TokenType::Plus,
-                '-' => TokenType::Minus,
-                '*' => TokenType::Star,
-                '/' => TokenType::Slash,
-                '^' => TokenType::Caret,
+        let position = self.pos;
+        let Some(ch) = self.next_char()  else {
+            return None
+        };
+        let token_type = match ch {
+            '+' => TokenType::Plus,
+            '-' => TokenType::Minus,
+            '*' => TokenType::Star,
+            '/' => TokenType::Slash,
+            '^' => TokenType::Caret,
 
-                '=' => {
-                    let mut token_type = TokenType::Equal;
-                    if let Some(next) = self.peek_char() {
-                        if next == '=' {
-                            token_type = TokenType::EqualEqual
-                        }
+            '=' => {
+                let mut token_type = TokenType::Equal;
+                if let Some(next) = self.peek_char() {
+                    if next == '=' {
+                        token_type = TokenType::EqualEqual
                     }
-                    token_type
                 }
-                '<' => {
-                    let mut token_type = TokenType::Less;
-                    if let Some(next) = self.peek_char() {
-                        if next == '=' {
-                            self.next_char();
-                            token_type = TokenType::LessEqual
-                        }
-                    }
-                    token_type
-                }
-                '>' => {
-                    let mut token_type = TokenType::Greater;
-                    if let Some(next) = self.peek_char() {
-                        if next == '=' {
-                            self.next_char();
-                            token_type = TokenType::GreaterEqual
-                        }
-                    }
-                    token_type
-                }
-
-                ':' => TokenType::Colon,
-                ';' => TokenType::Semicolon,
-
-                '.' => TokenType::Dot,
-                ',' => TokenType::Comma,
-
-                '(' => TokenType::LeftParenthesis,
-                ')' => TokenType::RightParenthesis,
-                '[' => TokenType::LeftSquareBracket,
-                ']' => TokenType::RightSquareBracket,
-                '{' => TokenType::LeftBrace,
-                '}' => TokenType::RightBrace,
-
-                '\n' => TokenType::NewLine,
-                _ => {
-                    // Non handled character, propagate error
-                    return None;
-                }
+                token_type
             }
-        } else {
-            token_type = TokenType::EndOfFile;
-        }
-        Some(Token::new(token_type, self.pos))
+            '<' => {
+                let mut token_type = TokenType::Less;
+                if let Some(next) = self.peek_char() {
+                    if next == '=' {
+                        self.next_char();
+                        token_type = TokenType::LessEqual
+                    }
+                }
+                token_type
+            }
+            '>' => {
+                let mut token_type = TokenType::Greater;
+                if let Some(next) = self.peek_char() {
+                    if next == '=' {
+                        self.next_char();
+                        token_type = TokenType::GreaterEqual
+                    }
+                }
+                token_type
+            }
+
+            ':' => TokenType::Colon,
+            ';' => TokenType::Semicolon,
+
+            '.' => TokenType::Dot,
+            ',' => TokenType::Comma,
+
+            '(' => TokenType::LeftParenthesis,
+            ')' => TokenType::RightParenthesis,
+            '[' => TokenType::LeftSquareBracket,
+            ']' => TokenType::RightSquareBracket,
+            '{' => TokenType::LeftBrace,
+            '}' => TokenType::RightBrace,
+
+            '\n' => TokenType::NewLine,
+            _ => {
+                // Non handled character, propagate error
+                return None;
+            }
+        };
+        Some(Token::new(token_type, position))
     }
 }
 
@@ -177,11 +174,6 @@ impl Iterator for Lexer {
     type Item = Token;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let token = self.next_token();
-        if let TokenType::EndOfFile = token.typ {
-            None
-        } else {
-            Some(token)
-        }
+        self.next_token()
     }
 }
