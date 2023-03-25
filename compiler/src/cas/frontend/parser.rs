@@ -18,6 +18,7 @@ pub struct ParsedContext {
 pub struct ParsedFunction {
     name: String,
     params: Vec<ParsedParameter>,
+    body: Expr
 }
 
 #[derive(Debug)]
@@ -131,6 +132,7 @@ impl Parser {
                     name: param_name,
                     type_name,
                 }],
+                body: function_body.clone(),
             },
         );
 
@@ -204,7 +206,7 @@ impl Parser {
     fn parse_identifier(&mut self) -> ParseResult<Expr> {
         let (_, id) = self.expect_identifier("Expected identifier.")?;
 
-        if self.get_token()?.typ == TokenType::LeftParenthesis {
+        if self.token_matches(TokenType::LeftParenthesis) {
             // Assume function call
             return self.parse_function_call(id);
         }
@@ -455,6 +457,18 @@ impl Parser {
             self.consume()?;
         }
         Ok(())
+    }
+
+    fn token_matches(&mut self, token_type: TokenType) -> bool {
+        let Ok(tok) = self.get_token() else {
+            return false;
+        };
+
+
+        // TODO: This is a nice function!
+        // self.get_token().is_ok_and(|token| { token.typ == token_type })
+
+        tok.typ == token_type
     }
 
     fn get_token(&self) -> ParseResult<Token> {
