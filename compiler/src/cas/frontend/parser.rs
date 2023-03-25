@@ -1,4 +1,5 @@
 use core::panic;
+use std::collections::HashMap;
 
 use matex_common::{
     error::ParseError,
@@ -8,11 +9,30 @@ use matex_common::{
 
 type ParseResult<T> = std::result::Result<T, ParseError>;
 
+#[derive(Default, Debug)]
+pub struct ParsedContext {
+    functions: HashMap<String, ParsedFunction>,
+}
+
+#[derive(Debug)]
+pub struct ParsedFunction {
+    name: String,
+    params: Vec<ParsedParameter>,
+}
+
+#[derive(Debug)]
+pub struct ParsedParameter {
+    name: String,
+    type_name: String,
+}
+
 pub struct Parser {
     tokens: Vec<Token>,
     // TODO: Reference from self.tokens instead?
     cur_token: Option<Token>,
     idx: usize,
+
+    pub parsed: ParsedContext,
 }
 
 impl Parser {
@@ -22,6 +42,7 @@ impl Parser {
             tokens,
             cur_token: Some(first_tok),
             idx: 0,
+            parsed: ParsedContext::default(),
         }
     }
 
@@ -62,56 +83,70 @@ impl Parser {
             return self.parse_statement();
         };
 
-        let name = id;
-        // TODO: Might not be function definition, could just be function call. Check/peek for TokenType::Equal after
+        let func_name = id;
+
+        // FIXME: Might not be function definition, could just be function call. Check/peek for TokenType::Equal after
         // matching parenthesis: abs(....(...)) =
         //                          ^---------^ Match this one
-        if next_token.typ == TokenType::LeftParenthesis {
-            self.expect_identifier("Expected function name")?;
-            // Function!
-            // parse parameters
-            self.expect(
-                TokenType::LeftParenthesis,
-                "Expected opening parenthesis after function name",
-            )?;
-
-            self.parse_parameter_and_type()?;
-
-            let _ = self.expect(
-                TokenType::RightParenthesis,
-                "Expected closing parenthesis after parameter list!",
-            );
-            let _ = self.expect(
-                TokenType::Equal,
-                "Expected assignment operator after function definition...",
-            );
-        } else {
+        if next_token.typ != TokenType::LeftParenthesis {
             return self.parse_statement();
         }
 
+        self.expect_identifier("Expected function name")?;
+        // Function!
+        // parse parameters
+        self.expect(
+            TokenType::LeftParenthesis,
+            "Expected opening parenthesis after function name",
+        )?;
+
+        // TODO: Loop parameter parsing
+        let (param_name, type_name) = self.parse_parameter_definition()?;
+
+        self.expect(
+            TokenType::RightParenthesis,
+            "Expected closing parenthesis after parameter list!",
+        )?;
+
+        self.expect(
+            TokenType::Equal,
+            "Expected assignment operator after function definition...",
+        )?;
+
         let function_body = self.parse_expression()?;
 
+        // TODO: Add function to consume newline OR end of stream.
+        // I.E. functions at the end of the file should parse expectedly, and not fail just because no newline character
         let _ = self.expect(
             TokenType::NewLine,
             "Expected newline after function definition.",
         );
 
+        // TODO: A lot of clones...
+        self.parsed.functions.insert(
+            func_name.clone(),
+            ParsedFunction {
+                name: func_name.clone(),
+                params: vec![ParsedParameter {
+                    name: param_name,
+                    type_name,
+                }],
+            },
+        );
+
         Ok(Statement::Function {
-            name,
+            name: func_name,
             function_body,
         })
     }
 
-    fn parse_parameter_and_type(&mut self) -> ParseResult<(String, Token)> {
-        let TokenType::Identifier(param_name) = self.consume()?.typ else {
-            panic!("Oh no!");
-        };
+    fn parse_parameter_definition(&mut self) -> ParseResult<(String, String)> {
+        let (_, param_name) = self.expect_identifier("Expected parameter name")?;
+
         // TODO: Do not use expect? => Instead check if type annotation is present to start with.
         self.expect(TokenType::Colon, "Expected colon after parameter name.")?;
 
-        let Ok(type_name) = self.expect_identifier("Expected type name after semicolon.") else {
-            panic!("No type name stuff");
-        };
+        let (_, type_name) = self.expect_identifier("Expected type name after semicolon.")?;
 
         Ok((param_name, type_name))
     }
@@ -124,9 +159,9 @@ impl Parser {
         let token = self.get_token()?;
         let mut node = match token.typ {
             TokenType::Number(_) => self.parse_number()?,
-            TokenType::Identifier(id) => self.parse_identifier(id)?,
+            TokenType::Identifier(_) => self.parse_identifier()?,
             TokenType::Keyword(kw) => self.parse_keyword(kw)?,
-            TokenType::Minus => todo!(),
+            TokenType::Minus => todo!("Implement unary"),
             TokenType::LeftParenthesis => self.parse_grouping()?,
             TokenType::LeftSquareBracket => todo!("Implement lists"),
             TokenType::RightSquareBracket => todo!("Implement lists"),
@@ -137,15 +172,6 @@ impl Parser {
             }
         };
 
-        println!("\nExpr: {:?}\n", node);
-        //println!("Current prec: {:?}", prec);
-
-        println!(
-            "Prec: {:?},\nCurrent Token: {},\nToken Precedence: {:?}\n",
-            prec,
-            self.get_token()?,
-            BinOp::from(self.get_token()?.typ).precedence()
-        );
         while !self.at_end() && prec <= BinOp::from(self.get_token()?.typ).precedence() {
             node = match self.get_token()?.typ {
                 TokenType::Plus => self.parse_addition(node)?,
@@ -162,24 +188,22 @@ impl Parser {
                     break;
                 }
             };
-            //println!("\nBinop: {:?}\n", node);
         }
 
-        //println!("\nReturning node: {:?}\n", node);
         Ok(node)
     }
 
     fn parse_number(&mut self) -> ParseResult<Expr> {
-        let TokenType::Number(n) = self.get_token()?.typ else {
-            panic!("shit");
+        let TokenType::Number(n) = self.consume()?.typ else {
+            panic!("Expected a number.");
         };
 
-        self.consume()?;
         Ok(Expr::Number(n))
     }
 
-    fn parse_identifier(&mut self, id: String) -> ParseResult<Expr> {
-        self.expect_identifier("Expected identifier.")?;
+    fn parse_identifier(&mut self) -> ParseResult<Expr> {
+        let (_, id) = self.expect_identifier("Expected identifier.")?;
+
         if self.get_token()?.typ == TokenType::LeftParenthesis {
             // Assume function call
             return self.parse_function_call(id);
@@ -343,7 +367,6 @@ impl Parser {
     }
 
     fn parse_assignment(&mut self, holder: Expr) -> ParseResult<Expr> {
-        dbg!("parse_assignment");
         self.expect(
             TokenType::Equal,
             "Expected assignment operator after variable name.",
@@ -359,24 +382,29 @@ impl Parser {
 }
 
 impl Parser {
-    fn expect(&mut self, tok: TokenType, message: &str) -> ParseResult<Token> {
-        let token = self.get_token()?;
-        if token.typ != tok {
-            // TODO: Change to ParseError?
-            panic!("Unexpected token!\n{:?}\n{}", token.typ, message);
+    fn expect(&mut self, expected_type: TokenType, message: &str) -> ParseResult<Token> {
+        let actual_typ = self.get_token()?.typ;
+        if actual_typ != expected_type {
+            // TODO: Change to ParseError
+            return Err(ParseError::WrongToken {
+                message: format!(
+                    "{}\nExpected: {:?}\nReceived: {:?}",
+                    message, expected_type, actual_typ
+                ),
+            });
         } else {
             self.consume()
         }
     }
-    fn expect_identifier(&mut self, message: &str) -> ParseResult<Token> {
+    fn expect_identifier(&mut self, message: &str) -> ParseResult<(Token, String)> {
         let token = self.get_token()?;
-        let TokenType::Identifier(_) = token.typ else {
+        let TokenType::Identifier(ident) = token.typ.clone() else {
             return Err(ParseError::WrongToken  {
                 message: format!("Expected an identifier: {:?}\n{}", token.typ, message)
             });
         };
         self.consume()?;
-        Ok(token)
+        Ok((token, ident))
     }
 
     fn expect_keyword(&mut self, expected_kw: KeywordType, message: &str) -> ParseResult<Token> {
@@ -407,7 +435,6 @@ impl Parser {
 
         if !self.at_end() {
             self.idx += 1;
-            println!("consumed {}", token);
 
             // TODO: Change to something iterator-like to not have to do this???
             // Also use TokenType::EndOfFile???
@@ -431,16 +458,12 @@ impl Parser {
     }
 
     fn get_token(&self) -> ParseResult<Token> {
-        if let Some(token) = self.cur_token.clone() {
-            Ok(token)
-        } else {
-            Err(ParseError::EndOfStream)
-        }
+        self.cur_token.clone().ok_or(ParseError::EndOfStream)
     }
 
-    fn peek(&self, offset: i32) -> Option<Token> {
-        let index = self.idx as i32 + offset;
-        if index < self.tokens.len() as i32 && index >= 0 {
+    fn peek(&self, offset: isize) -> Option<Token> {
+        let index = self.idx as isize + offset;
+        if index < self.tokens.len() as isize && index >= 0 {
             Some(self.tokens[index as usize].clone())
         } else {
             None
