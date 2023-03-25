@@ -9,3 +9,4 @@ edition = "2021"
 matex-compiler = { path = "../compiler" }
 matex-common = { path = "../common" }
 clap = { version = "4.1.8", features = ["derive"] }
+rustyline = "11.0.0"
