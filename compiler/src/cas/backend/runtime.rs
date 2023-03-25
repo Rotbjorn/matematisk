@@ -1,8 +1,8 @@
 use std::{collections::HashMap, ops::Deref};
 
-use matex_common::node::{Statement, Expr, BinOp};
+use matex_common::node::{BinOp, Expr, Statement};
 
-use super::visit::Visitor;
+use matex_common::node::Visitor;
 
 #[derive(Clone, Debug)]
 pub enum RuntimeVal {
@@ -19,15 +19,17 @@ pub enum RuntimeVal {
 #[derive(Default)]
 pub struct RuntimeVisitor {
     functions: HashMap<String, Expr>,
-    variables: HashMap<String, RuntimeVal>
+    variables: HashMap<String, RuntimeVal>,
 }
-
 
 impl Visitor<RuntimeVal> for RuntimeVisitor {
     fn visit_statement(&mut self, statement: &Statement) -> RuntimeVal {
         match statement {
             Statement::Program(statements) => self.visit_program(statements),
-            Statement::Function { name, function_body } => self.visit_function(name, function_body),
+            Statement::Function {
+                name,
+                function_body,
+            } => self.visit_function(name, function_body),
             Statement::Expression(expr) => self.visit_expr(expr),
         }
     }
@@ -38,9 +40,17 @@ impl Visitor<RuntimeVal> for RuntimeVisitor {
             Expr::Number(n) => RuntimeVal::Number(*n),
             Expr::Variable(name) => self.visit_variable(name),
             Expr::List(_) => todo!("Not handling List"),
-            Expr::BinaryOp { left, operation, right } => self.visit_binary_operation(left, operation, right),
+            Expr::BinaryOp {
+                left,
+                operation,
+                right,
+            } => self.visit_binary_operation(left, operation, right),
             Expr::Assignment { holder, value } => self.visit_assignment(holder, value),
-            Expr::If { condition, body, else_body } => self.visit_if(condition, body, else_body),
+            Expr::If {
+                condition,
+                body,
+                else_body,
+            } => self.visit_if(condition, body, else_body),
             Expr::FunctionCall { name, args } => self.visit_function_call(name, args),
         }
     }
@@ -48,7 +58,6 @@ impl Visitor<RuntimeVal> for RuntimeVisitor {
 
 impl RuntimeVisitor {
     fn visit_program(&mut self, statements: &Vec<Statement>) -> RuntimeVal {
-        
         let mut value = RuntimeVal::Number(-1.0);
         for statement in statements {
             value = self.visit_statement(statement);
@@ -58,9 +67,9 @@ impl RuntimeVisitor {
     }
 
     fn visit_function(&mut self, func_name: &String, function_body: &Expr) -> RuntimeVal {
-
         // TODO: Move ownership instead of clone?
-        self.functions.insert(func_name.clone(), function_body.clone());
+        self.functions
+            .insert(func_name.clone(), function_body.clone());
 
         return RuntimeVal::Unit;
     }
@@ -73,38 +82,38 @@ impl RuntimeVisitor {
         }
     }
 
-    fn visit_binary_operation(&mut self, left: &Box<Expr>, operation: &BinOp, right: &Box<Expr>) -> RuntimeVal {
-
+    fn visit_binary_operation(
+        &mut self,
+        left: &Box<Expr>,
+        operation: &BinOp,
+        right: &Box<Expr>,
+    ) -> RuntimeVal {
         let lhs = self.visit_expr(left);
         let rhs = self.visit_expr(right);
 
         match lhs {
-            RuntimeVal::Number(lhs) => {
-                match rhs {
-                    RuntimeVal::Number(rhs) => {
-                        match operation {
-                            BinOp::Add => RuntimeVal::Number(lhs + rhs),
-                            BinOp::Subtract => RuntimeVal::Number(lhs - rhs),
-                            BinOp::Multiply => RuntimeVal::Number(lhs * rhs),
-                            BinOp::Divide => RuntimeVal::Number(lhs / rhs),
-                            BinOp::Power => RuntimeVal::Number(lhs.powf(rhs)),
-                            BinOp::Less =>  RuntimeVal::Bool(lhs < rhs),
-                            BinOp::LessEqual =>  RuntimeVal::Bool(lhs <= rhs),
-                            BinOp::Greater =>  RuntimeVal::Bool(lhs > rhs),
-                            BinOp::GreaterEqual =>  RuntimeVal::Bool(lhs >= rhs),
-                            _ => panic!("Unhandled binary operation")
-                        }
-                    }
-                    _ => todo!("Error")
-                }
-            }
-            _ => todo!("Error")
+            RuntimeVal::Number(lhs) => match rhs {
+                RuntimeVal::Number(rhs) => match operation {
+                    BinOp::Add => RuntimeVal::Number(lhs + rhs),
+                    BinOp::Subtract => RuntimeVal::Number(lhs - rhs),
+                    BinOp::Multiply => RuntimeVal::Number(lhs * rhs),
+                    BinOp::Divide => RuntimeVal::Number(lhs / rhs),
+                    BinOp::Power => RuntimeVal::Number(lhs.powf(rhs)),
+                    BinOp::Less => RuntimeVal::Bool(lhs < rhs),
+                    BinOp::LessEqual => RuntimeVal::Bool(lhs <= rhs),
+                    BinOp::Greater => RuntimeVal::Bool(lhs > rhs),
+                    BinOp::GreaterEqual => RuntimeVal::Bool(lhs >= rhs),
+                    _ => panic!("Unhandled binary operation"),
+                },
+                _ => todo!("Error"),
+            },
+            _ => todo!("Error"),
         }
     }
 
     fn visit_assignment(&mut self, holder: &Box<Expr>, value: &Box<Expr>) -> RuntimeVal {
         dbg!(holder, value);
-        
+
         // TOOD: Move ownership instead?
         let Expr::Variable(holder) = holder.deref() else {
             panic!("Unhandled holder expression");
@@ -119,13 +128,17 @@ impl RuntimeVisitor {
         value
     }
 
-    fn visit_if(&mut self, condition: &Box<Expr>, body: &Box<Expr>, else_body: &Box<Expr>) -> RuntimeVal {
-
+    fn visit_if(
+        &mut self,
+        condition: &Box<Expr>,
+        body: &Box<Expr>,
+        else_body: &Box<Expr>,
+    ) -> RuntimeVal {
         let condition = self.visit_expr(condition);
 
         let RuntimeVal::Bool(b) = condition else {
             eprintln!("Expected a boolean value, got {:?}", condition);
-            return RuntimeVal::Unit  
+            return RuntimeVal::Unit
         };
 
         let value = if b {
@@ -136,9 +149,8 @@ impl RuntimeVisitor {
 
         value
     }
-    
+
     fn visit_function_call(&mut self, name: &String, arguments: &Vec<Expr>) -> RuntimeVal {
-        
         let mut runtime_vals = Vec::<RuntimeVal>::new();
 
         for argument in arguments {
