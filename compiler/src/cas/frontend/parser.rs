@@ -15,13 +15,15 @@ pub struct ParsedContext {
 }
 
 #[derive(Debug)]
+#[allow(dead_code)]
 pub struct ParsedFunction {
     name: String,
     params: Vec<ParsedParameter>,
-    body: Expr
+    body: Expr,
 }
 
 #[derive(Debug)]
+#[allow(dead_code)]
 pub struct ParsedParameter {
     name: String,
     type_name: String,
@@ -38,10 +40,10 @@ pub struct Parser {
 
 impl Parser {
     pub fn new(tokens: Vec<Token>) -> Self {
-        let first_tok = tokens[0].clone();
+        let cur_token = tokens.get(0).cloned();
         Self {
             tokens,
-            cur_token: Some(first_tok),
+            cur_token,
             idx: 0,
             parsed: ParsedContext::default(),
         }
@@ -294,16 +296,11 @@ impl Parser {
     fn parse_subtraction(&mut self, left: Expr) -> ParseResult<Expr> {
         self.expect(TokenType::Minus, "Expected subtraction operator")?;
         let right = self.parse_precedence(Precedence::Factor)?;
-        let right_node = Expr::BinaryOp {
-            left: (Expr::Number(-1.0).into()),
-            operation: BinOp::Multiply,
-            right: (right.into()),
-        };
 
         let node = Expr::BinaryOp {
-            left: left.into(),
-            operation: BinOp::Add,
-            right: right_node.into(),
+            left: Box::new(left),
+            operation: BinOp::Subtract,
+            right: Box::new(right),
         };
         Ok(node)
     }
@@ -322,16 +319,11 @@ impl Parser {
     fn parse_division(&mut self, left: Expr) -> ParseResult<Expr> {
         self.consume()?;
         let right = self.parse_precedence(Precedence::Exponent)?;
-        let right_node = Expr::BinaryOp {
-            left: right.into(),
-            operation: BinOp::Power,
-            right: (Expr::Number(-1.0).into()),
-        };
 
         let node = Expr::BinaryOp {
-            left: left.into(),
-            operation: BinOp::Multiply,
-            right: right_node.into(),
+            left: Box::new(left),
+            operation: BinOp::Divide,
+            right: Box::new(right),
         };
         Ok(node)
     }
@@ -388,16 +380,17 @@ impl Parser {
         let actual_typ = self.get_token()?.typ;
         if actual_typ != expected_type {
             // TODO: Change to ParseError
-            return Err(ParseError::WrongToken {
+            Err(ParseError::WrongToken {
                 message: format!(
                     "{}\nExpected: {:?}\nReceived: {:?}",
                     message, expected_type, actual_typ
                 ),
-            });
+            })
         } else {
             self.consume()
         }
     }
+
     fn expect_identifier(&mut self, message: &str) -> ParseResult<(Token, String)> {
         let token = self.get_token()?;
         let TokenType::Identifier(ident) = token.typ.clone() else {
@@ -429,32 +422,22 @@ impl Parser {
         Ok(token)
     }
 
-    // TODO: Maybe add consume_error()/similar function
-    // to signify a consume that shouldn't result in EndOfStream
-    // I.E. in the middle of parsing something that is expected
     fn consume(&mut self) -> ParseResult<Token> {
-        let token = self.get_token()?;
+        let previous_token = self.get_token()?;
 
-        if !self.at_end() {
-            self.idx += 1;
+        self.idx += 1;
+        self.cur_token = self.tokens.get(self.idx).cloned();
 
-            // TODO: Change to something iterator-like to not have to do this???
-            // Also use TokenType::EndOfFile???
-            if !self.at_end() {
-                self.cur_token = Some(self.tokens[self.idx].clone());
-            } else {
-                self.cur_token = None
-            }
-            Ok(token)
-        } else {
-            self.cur_token = None;
-            Err(ParseError::EndOfStream)
-        }
+        Ok(previous_token)
     }
 
     fn consume_newlines(&mut self) -> ParseResult<()> {
-        while self.get_token()?.typ == TokenType::NewLine {
-            self.consume()?;
+        while let Ok(token) = self.get_token() {
+            if token.typ == TokenType::NewLine {
+                self.consume()?;
+            } else {
+                break;
+            }
         }
         Ok(())
     }
@@ -463,7 +446,6 @@ impl Parser {
         let Ok(tok) = self.get_token() else {
             return false;
         };
-
 
         // TODO: This is a nice function!
         // self.get_token().is_ok_and(|token| { token.typ == token_type })
@@ -475,16 +457,11 @@ impl Parser {
         self.cur_token.clone().ok_or(ParseError::EndOfStream)
     }
 
-    fn peek(&self, offset: isize) -> Option<Token> {
-        let index = self.idx as isize + offset;
-        if index < self.tokens.len() as isize && index >= 0 {
-            Some(self.tokens[index as usize].clone())
-        } else {
-            None
-        }
+    fn peek(&mut self, offset: isize) -> Option<&Token> {
+        self.tokens.get((self.idx as isize + offset) as usize)
     }
 
-    fn at_end(&self) -> bool {
-        self.idx >= self.tokens.len()
+    fn at_end(&mut self) -> bool {
+        self.cur_token.is_none()
     }
 }
