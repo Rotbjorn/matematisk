@@ -63,15 +63,15 @@ impl RuntimeVisitor {
             value = self.visit_statement(statement);
         }
 
-        return value;
+        value
     }
 
-    fn visit_function(&mut self, func_name: &String, function_body: &Expr) -> RuntimeVal {
+    fn visit_function(&mut self, func_name: &str, function_body: &Expr) -> RuntimeVal {
         // TODO: Move ownership instead of clone?
         self.functions
-            .insert(func_name.clone(), function_body.clone());
+            .insert(func_name.to_owned(), function_body.clone());
 
-        return RuntimeVal::Unit;
+        RuntimeVal::Unit
     }
 
     fn visit_variable(&mut self, name: &String) -> RuntimeVal {
@@ -84,9 +84,9 @@ impl RuntimeVisitor {
 
     fn visit_binary_operation(
         &mut self,
-        left: &Box<Expr>,
+        left: &Expr,
         operation: &BinOp,
-        right: &Box<Expr>,
+        right: &Expr,
     ) -> RuntimeVal {
         let lhs = self.visit_expr(left);
         let rhs = self.visit_expr(right);
@@ -111,7 +111,7 @@ impl RuntimeVisitor {
         }
     }
 
-    fn visit_assignment(&mut self, holder: &Box<Expr>, value: &Box<Expr>) -> RuntimeVal {
+    fn visit_assignment(&mut self, holder: &Expr, value: &Expr) -> RuntimeVal {
         dbg!(holder, value);
 
         // TOOD: Move ownership instead?
@@ -128,12 +128,7 @@ impl RuntimeVisitor {
         value
     }
 
-    fn visit_if(
-        &mut self,
-        condition: &Box<Expr>,
-        body: &Box<Expr>,
-        else_body: &Box<Expr>,
-    ) -> RuntimeVal {
+    fn visit_if(&mut self, condition: &Expr, body: &Expr, else_body: &Expr) -> RuntimeVal {
         let condition = self.visit_expr(condition);
 
         let RuntimeVal::Bool(b) = condition else {
