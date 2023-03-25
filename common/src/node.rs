@@ -135,20 +135,19 @@ impl<'a, W: Write> ASTGraphGenerator<'a, W> {
     }
 }
 
-
 // TODO: There is a library for creating Graphviz dot files!
 impl<'a, W: Write> Visitor<Result<u32, Error>> for ASTGraphGenerator<'a, W> {
     fn visit_statement(&mut self, statement: &Statement) -> Result<u32, Error> {
         let current_node_id = self.count;
         match statement {
             Statement::Program(v) => {
-                write!(self.out, "\tN_{} [label = \"<>\"]\n", current_node_id)?;
+                writeln!(self.out, "\tN_{} [label = \"<>\"]", current_node_id)?;
                 self.count += 1;
                 for (index, node) in v.iter().enumerate() {
                     let target_id = self.visit_statement(node)?;
-                    write!(
+                    writeln!(
                         self.out,
-                        "\tN_{} -> N_{} [label = \"{}\"]\n",
+                        "\tN_{} -> N_{} [label = \"{}\"]",
                         current_node_id, target_id, index
                     )?;
                 }
@@ -158,16 +157,16 @@ impl<'a, W: Write> Visitor<Result<u32, Error>> for ASTGraphGenerator<'a, W> {
                 name: function_name,
                 function_body,
             } => {
-                write!(
+                writeln!(
                     self.out,
-                    "\tN_{} [label = \"func: {}\"]\n",
+                    "\tN_{} [label = \"func: {}\"]",
                     current_node_id, function_name
                 )?;
                 self.count += 1;
 
                 let body_id = self.visit_expr(function_body)?;
 
-                write!(self.out, "\tN_{} ->  N_{} \n", current_node_id, body_id)?;
+                writeln!(self.out, "\tN_{} ->  N_{}", current_node_id, body_id)?;
             }
             Statement::Expression(expr) => {
                 let _target_id = self.visit_expr(expr);
@@ -182,11 +181,11 @@ impl<'a, W: Write> Visitor<Result<u32, Error>> for ASTGraphGenerator<'a, W> {
         let current_node_id = self.count;
         match expr {
             Expr::List(v) => {
-                write!(self.out, "\tN_{} [label = \"<>\"]\n", current_node_id)?;
+                writeln!(self.out, "\tN_{} [label = \"<>\"]", current_node_id)?;
                 self.count += 1;
                 for (index, node) in v.iter().enumerate() {
                     let target_id = self.visit_expr(node)?;
-                    write!(
+                    writeln!(
                         self.out,
                         "\tN_{} -> N_{} [label = \"{}\"]\n",
                         current_node_id, target_id, index
@@ -194,19 +193,11 @@ impl<'a, W: Write> Visitor<Result<u32, Error>> for ASTGraphGenerator<'a, W> {
                 }
             }
             Expr::Number(n) => {
-                write!(
-                    self.out,
-                    "\tN_{} [label = \"num: {}\"]\n",
-                    current_node_id, n
-                )?;
+                writeln!(self.out, "\tN_{} [label = \"num: {}\"]", current_node_id, n)?;
                 self.count += 1;
             }
             Expr::Variable(s) => {
-                write!(
-                    self.out,
-                    "\tN_{} [label = \"var: {}\"]\n",
-                    current_node_id, s
-                )?;
+                writeln!(self.out, "\tN_{} [label = \"var: {}\"]", current_node_id, s)?;
                 self.count += 1;
             }
             Expr::BinaryOp {
@@ -214,9 +205,9 @@ impl<'a, W: Write> Visitor<Result<u32, Error>> for ASTGraphGenerator<'a, W> {
                 operation,
                 right,
             } => {
-                write!(
+                writeln!(
                     self.out,
-                    "\tN_{} [label = \"{:?}\"]\n",
+                    "\tN_{} [label = \"{:?}\"]",
                     current_node_id, operation
                 )?;
                 self.count += 1;
@@ -225,34 +216,30 @@ impl<'a, W: Write> Visitor<Result<u32, Error>> for ASTGraphGenerator<'a, W> {
                 let rhs_id = self.visit_expr(right)?;
 
                 if *operation == BinOp::Power {
-                    write!(
+                    writeln!(
                         self.out,
-                        "\tN_{0} -> N_{1} [label = \"base\"]\nN_{0} -> N_{2} [label = \"exp\"]\n",
+                        "\tN_{0} -> N_{1} [label = \"base\"]\nN_{0} -> N_{2} [label = \"exp\"]",
                         current_node_id, lhs_id, rhs_id
                     )?;
                 } else {
-                    write!(
+                    writeln!(
                         self.out,
-                        "\tN_{0} -> N_{1} [label = \"lhs\"]\n\tN_{0} -> N_{2} [label = \"rhs\"]\n",
+                        "\tN_{0} -> N_{1} [label = \"lhs\"]\n\tN_{0} -> N_{2} [label = \"rhs\"]",
                         current_node_id, lhs_id, rhs_id
                     )?;
                 }
             }
 
             Expr::Assignment { holder, value } => {
-                write!(
-                    self.out,
-                    "\tN_{} [label = \"Assignment\"]\n",
-                    current_node_id
-                )?;
+                writeln!(self.out, "\tN_{} [label = \"Assignment\"]", current_node_id)?;
                 self.count += 1;
 
                 let holder_id = self.visit_expr(holder)?;
                 let value_id = self.visit_expr(value)?;
 
-                write!(
+                writeln!(
                     self.out,
-                    "\tN_{0} -> N_{1} [label = \"holder\"]\n\tN_{0} -> N_{2} [label = \"value\"]\n",
+                    "\tN_{0} -> N_{1} [label = \"holder\"]\n\tN_{0} -> N_{2} [label = \"value\"]",
                     current_node_id, holder_id, value_id
                 )?;
             }
@@ -262,42 +249,42 @@ impl<'a, W: Write> Visitor<Result<u32, Error>> for ASTGraphGenerator<'a, W> {
                 body,
                 else_body,
             } => {
-                write!(self.out, "\tN_{} [label = \"if\"]\n", current_node_id)?;
+                writeln!(self.out, "\tN_{} [label = \"if\"]\n", current_node_id)?;
                 self.count += 1;
 
                 let condition_id = self.visit_expr(condition)?;
                 let body = self.visit_expr(body)?;
                 let else_body = self.visit_expr(else_body)?;
 
-                write!(
+                writeln!(
                     self.out,
-                    "\tN_{} -> N_{} [label = \"condition\"]\n",
+                    "\tN_{} -> N_{} [label = \"condition\"]",
                     current_node_id, condition_id
                 )?;
 
-                write!(
+                writeln!(
                     self.out,
-                    "\tN_{} -> N_{} [label = \"truthy\"]\n",
+                    "\tN_{} -> N_{} [label = \"truthy\"]",
                     current_node_id, body
                 )?;
-                write!(
+                writeln!(
                     self.out,
-                    "\tN_{} -> N_{} [label = \"falsy\"]\n",
+                    "\tN_{} -> N_{} [label = \"falsy\"]",
                     current_node_id, else_body
                 )?;
             }
             Expr::FunctionCall { name, args } => {
-                write!(
+                writeln!(
                     self.out,
-                    "\tN_{} [label = \"func_call: {}\"]\n",
+                    "\tN_{} [label = \"func_call: {}\"]",
                     current_node_id, name
                 )?;
                 self.count += 1;
                 for (index, node) in args.iter().enumerate() {
                     let target_id = self.visit_expr(node)?;
-                    write!(
+                    writeln!(
                         self.out,
-                        "\tN_{} -> N_{} [label = \"{}\"]\n",
+                        "\tN_{} -> N_{} [label = \"{}\"]",
                         current_node_id, target_id, index
                     )?;
                 }
