@@ -8,6 +8,18 @@ pub struct Token {
     pub pos: Position,
 }
 
+impl Token {
+    pub fn new(typ: TokenType, pos: Position) -> Token {
+        Self { typ, pos }
+    }
+}
+
+impl Display for Token {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_fmt(format_args!("{{ {:?}, {} }}", self.typ, self.pos))
+    }
+}
+
 #[derive(Debug, Clone)]
 #[allow(dead_code)]
 pub enum TokenType {
@@ -45,26 +57,14 @@ pub enum TokenType {
     EndOfFile, // TODO: Check if not needed?!
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub enum KeywordType {
-    If,
-    Else,
-}
-
-impl Token {
-    pub fn new(typ: TokenType, pos: Position) -> Token {
-        Self { typ, pos }
-    }
-}
-
 impl PartialEq for TokenType {
     fn eq(&self, other: &Self) -> bool {
         core::mem::discriminant(self) == core::mem::discriminant(other)
     }
 }
 
-impl Display for Token {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_fmt(format_args!("{{ {:?}, {} }}", self.typ, self.pos))
-    }
+#[derive(Debug, Clone, PartialEq)]
+pub enum KeywordType {
+    If,
+    Else,
 }
