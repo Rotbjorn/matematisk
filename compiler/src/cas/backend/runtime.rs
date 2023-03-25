@@ -11,18 +11,28 @@ pub enum RuntimeVal {
     // TODO: Add complex, real, etc
     Number(f64),
     Symbol(String),
-    Expression(Expr),
+    Expression(AlgebraExpr),
 
     Bool(bool),
 }
 
+#[derive(Clone, Debug)]
+pub enum AlgebraExpr {
+    Sum(Vec<AlgebraExpr>),
+    Product(Vec<AlgebraExpr>),
+    Exponent {
+        base: Box<AlgebraExpr>,
+        exponent: Box<AlgebraExpr>,
+    },
+}
+
 #[derive(Default)]
-pub struct RuntimeVisitor {
+pub struct Runtime {
     functions: HashMap<String, Expr>,
     variables: HashMap<String, RuntimeVal>,
 }
 
-impl Visitor<RuntimeVal> for RuntimeVisitor {
+impl Visitor<RuntimeVal> for Runtime {
     fn visit_statement(&mut self, statement: &Statement) -> RuntimeVal {
         match statement {
             Statement::Program(statements) => self.visit_program(statements),
@@ -56,7 +66,7 @@ impl Visitor<RuntimeVal> for RuntimeVisitor {
     }
 }
 
-impl RuntimeVisitor {
+impl Runtime {
     fn visit_program(&mut self, statements: &Vec<Statement>) -> RuntimeVal {
         let mut value = RuntimeVal::Number(-1.0);
         for statement in statements {

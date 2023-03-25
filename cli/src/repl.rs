@@ -2,49 +2,55 @@ use std::{fs::File, io::Write, str::FromStr};
 
 use matex_common::node::{ASTGraphGenerator, Statement, Visitor};
 use matex_compiler::cas::{
-    backend::runtime::RuntimeVisitor,
+    backend::runtime::Runtime,
     frontend::{lexer, parser},
 };
 use rustyline::error::ReadlineError;
 
-pub fn repl() -> Result<(), ReadlineError> {
-    let mut rl = rustyline::DefaultEditor::new()?;
+#[derive(Default)]
+pub struct REPL {
+    runtime: Runtime,
+}
 
-    loop {
-        let input = rl.readline("matex > ")?.trim().to_string();
+impl REPL {
+    pub fn run(&mut self) -> Result<(), ReadlineError> {
+        let mut rl = rustyline::DefaultEditor::new()?;
 
-        if input.starts_with(':') {
-            let Ok(command) = input.parse::<Command>() else {
+        loop {
+            let input = rl.readline("matex > ")?.trim().to_string();
+
+            if input.starts_with(':') {
+                let Ok(command) = input.parse::<Command>() else {
                 eprintln!("Unknown command!");
                 continue;
             };
 
-            let result = command.execute();
+                let result = command.execute();
 
+                match result {
+                    CommandResult::Exit => break,
+                    CommandResult::None => {}
+                }
+                continue;
+            }
+
+            let mut parser = parser::Parser::new(lexer::Lexer::new(&input).collect());
+            let result = parser.parse();
+            dbg!(parser.parsed);
             match result {
-                CommandResult::Exit => break,
-                CommandResult::None => {}
-            }
-            continue;
-        }
+                Ok(ast) => {
+                    let exit_value = self.runtime.visit_statement(&ast);
 
-        let mut parser = parser::Parser::new(lexer::Lexer::new(&input).collect());
-        let result = parser.parse();
-        dbg!(parser.parsed);
-        match result {
-            Ok(ast) => {
-                let exit_value = RuntimeVisitor::default().visit_statement(&ast);
-
-                println!("{:?}", exit_value);
-            }
-            Err(e) => {
-                eprintln!("Error occurred:\n{}", e);
+                    println!("{:?}", exit_value);
+                }
+                Err(e) => {
+                    eprintln!("Error occurred:\n{}", e);
+                }
             }
         }
+        Ok(())
     }
-    Ok(())
 }
-
 #[derive(Debug, Clone)]
 pub struct Command {
     input: String,

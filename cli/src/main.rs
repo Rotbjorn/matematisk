@@ -6,11 +6,12 @@ use std::{
 
 use matex_common::node::{ASTGraphGenerator, Visitor};
 use matex_compiler::cas::{
-    backend::runtime::RuntimeVisitor,
+    backend::runtime::Runtime,
     frontend::{lexer, parser},
 };
 
 use clap::{Parser, Subcommand};
+use repl::REPL;
 
 mod repl;
 
@@ -74,12 +75,13 @@ fn main() {
                 .expect("Couldn't write to dot file!");
         }
 
-        let mut runtime = RuntimeVisitor::default();
+        let mut runtime = Runtime::default();
 
         let exit_value = runtime.visit_statement(&ast);
 
         println!("EXIT VALUE: {:?}", exit_value);
     } else {
-        let _ = repl::repl();
+        let mut repl = REPL::default();
+        let _ = repl.run();
     }
 }
