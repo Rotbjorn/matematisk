@@ -1,3 +1,5 @@
+use std::fmt::{Error, Write};
+
 use crate::token::TokenType;
 
 type Statements = Vec<Statement>;
@@ -7,58 +9,6 @@ pub enum Statement {
     Program(Statements),
     Function { name: String, function_body: Expr },
     Expression(Expr),
-}
-
-impl Statement {
-    pub fn render_dot_graph_notation(&self, out: &mut String) {
-        out.push_str("digraph AST {\n");
-        out.push_str("label = \"Abstract Syntax Tree\"\n");
-        out.push_str("fontname = \"Arial\"\n");
-        out.push_str("node [fontname = \"Arial\"]\n");
-        out.push_str("edge [fontname = \"Arial\"]\n");
-        let mut count: u32 = 0;
-        self.render_dot_graph_notation_impl(out, &mut count);
-        out.push('}');
-    }
-
-    fn render_dot_graph_notation_impl(&self, out: &mut String, count: &mut u32) -> u32 {
-        let current_node_id = *count;
-        use Statement::*;
-        match self {
-            Program(v) => {
-                out.push_str(format!("N_{} [label = \"<>\"]\n", current_node_id).as_str());
-                *count += 1;
-                for (index, node) in v.iter().enumerate() {
-                    let target_id = node.render_dot_graph_notation_impl(out, count);
-                    out.push_str(
-                        format!(
-                            "N_{} -> N_{} [label = \"{}\"]\n",
-                            current_node_id, target_id, index
-                        )
-                        .as_str(),
-                    );
-                }
-            }
-            Function {
-                name,
-                function_body,
-            } => {
-                out.push_str(
-                    format!("N_{} [label = \"func: {}\"]\n", current_node_id, name).as_str(),
-                );
-                *count += 1;
-
-                let body_id = function_body.render_dot_graph_notation_impl(out, count);
-
-                out.push_str(format!("N_{} ->  N_{} \n", current_node_id, body_id).as_str());
-            }
-            Expression(ex) => {
-                let _target_id = ex.render_dot_graph_notation_impl(out, count);
-                *count += 1;
-            }
-        }
-        current_node_id
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -90,129 +40,6 @@ pub enum Expr {
         name: String,
         args: Vec<Expr>,
     },
-}
-
-impl Expr {
-    pub fn render_dot_graph_notation_impl(&self, out: &mut String, count: &mut u32) -> u32 {
-        let current_node_id = *count;
-        use Expr::*;
-        match self {
-            List(v) => {
-                out.push_str(format!("N_{} [label = \"<>\"]\n", current_node_id).as_str());
-                *count += 1;
-                for (index, node) in v.iter().enumerate() {
-                    out.push_str(format!("S_{0} [label = \"{0}\"]\n", index).as_str());
-                    out.push_str(format!("N_{} -> S_{}\n", current_node_id, index).as_str());
-                    let target_id = node.render_dot_graph_notation_impl(out, count);
-                    out.push_str(format!("S_{} -> N_{}\n", index, target_id).as_str());
-                }
-            }
-            Number(n) => {
-                out.push_str(format!("N_{} [label = \"num: {}\"]\n", current_node_id, n).as_str());
-                *count += 1;
-            }
-            Variable(s) => {
-                out.push_str(format!("N_{} [label = \"var: {}\"]\n", current_node_id, s).as_str());
-                *count += 1;
-            }
-            BinaryOp {
-                left,
-                operation,
-                right,
-            } => {
-                out.push_str(
-                    format!("N_{} [label = \"{:?}\"]\n", current_node_id, operation).as_str(),
-                );
-                *count += 1;
-
-                let lhs_id = left.render_dot_graph_notation_impl(out, count);
-                let rhs_id = right.render_dot_graph_notation_impl(out, count);
-
-                if *operation == BinOp::Power {
-                    out.push_str(
-                        format!(
-                            "N_{0} -> N_{1} [label = \"base\"]\nN_{0} -> N_{2} [label = \"exp\"]\n",
-                            current_node_id, lhs_id, rhs_id
-                        )
-                        .as_str(),
-                    );
-                } else {
-                    out.push_str(
-                        format!(
-                            "N_{0} -> N_{1} [label = \"lhs\"]\nN_{0} -> N_{2} [label = \"rhs\"]\n",
-                            current_node_id, lhs_id, rhs_id
-                        )
-                        .as_str(),
-                    );
-                }
-            }
-
-            Assignment { holder, value } => {
-                out.push_str(format!("N_{} [label = \"Assignment\"]\n", current_node_id).as_str());
-                *count += 1;
-
-                let holder_id = holder.render_dot_graph_notation_impl(out, count);
-                let value_id = value.render_dot_graph_notation_impl(out, count);
-
-                out.push_str(
-                    format!(
-                        "N_{0} -> N_{1} [label = \"holder\"]\nN_{0} -> N_{2} [label = \"value\"]\n",
-                        current_node_id, holder_id, value_id
-                    )
-                    .as_str(),
-                );
-            }
-
-            If {
-                condition,
-                body,
-                else_body,
-            } => {
-                out.push_str(format!("N_{} [label = \"if\"]\n", current_node_id).as_str());
-                *count += 1;
-
-                let condition_id = condition.render_dot_graph_notation_impl(out, count);
-                let body = body.render_dot_graph_notation_impl(out, count);
-                let else_body = else_body.render_dot_graph_notation_impl(out, count);
-
-                out.push_str(
-                    format!(
-                        "N_{} -> N_{} [label = \"condition\"]\n",
-                        current_node_id, condition_id
-                    )
-                    .as_str(),
-                );
-
-                out.push_str(
-                    format!("N_{} -> N_{} [label = \"truthy\"]\n", current_node_id, body).as_str(),
-                );
-                out.push_str(
-                    format!(
-                        "N_{} -> N_{} [label = \"falsy\"]\n",
-                        current_node_id, else_body
-                    )
-                    .as_str(),
-                );
-            }
-            FunctionCall { name, args } => {
-                out.push_str(
-                    format!("N_{} [label = \"func_call: {}\"]\n", current_node_id, name).as_str(),
-                );
-                *count += 1;
-                for (index, node) in args.iter().enumerate() {
-                    let target_id = node.render_dot_graph_notation_impl(out, count);
-                    out.push_str(
-                        format!(
-                            "N_{} -> N_{} [label = \"{}\"]\n",
-                            current_node_id, target_id, index
-                        )
-                        .as_str(),
-                    );
-                }
-            }
-        }
-        current_node_id
-    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -276,4 +103,206 @@ pub enum Precedence {
     Term,
     Factor,
     Exponent,
+}
+
+pub trait Visitor<T> {
+    fn visit_statement(&mut self, n: &Statement) -> T;
+    fn visit_expr(&mut self, n: &Expr) -> T;
+}
+
+pub struct ASTGraphGenerator<'a, W: Write> {
+    count: u32,
+    out: &'a mut W,
+}
+
+impl<'a, W: Write> ASTGraphGenerator<'a, W> {
+    pub fn new(out: &'a mut W) -> Self {
+        Self { count: 0, out }
+    }
+
+    pub fn create_dot_graph(&mut self, stmt: &Statement) -> Result<(), Error> {
+        self.out.write_str("digraph AST {\n")?;
+        self.out.write_str("\tlabel = \"Abstract Syntax Tree\"\n")?;
+        self.out.write_str("\tfontname = \"Arial\"\n")?;
+        self.out.write_str("\tnode [fontname = \"Arial\"]\n")?;
+        self.out.write_str("\tedge [fontname = \"Arial\"]\n\n")?;
+
+        self.visit_statement(stmt)?;
+
+        self.out.write_char('}')?;
+
+        Ok(())
+    }
+}
+
+
+// TODO: There is a library for creating Graphviz dot files!
+impl<'a, W: Write> Visitor<Result<u32, Error>> for ASTGraphGenerator<'a, W> {
+    fn visit_statement(&mut self, statement: &Statement) -> Result<u32, Error> {
+        let current_node_id = self.count;
+        match statement {
+            Statement::Program(v) => {
+                write!(self.out, "\tN_{} [label = \"<>\"]\n", current_node_id)?;
+                self.count += 1;
+                for (index, node) in v.iter().enumerate() {
+                    let target_id = self.visit_statement(node)?;
+                    write!(
+                        self.out,
+                        "\tN_{} -> N_{} [label = \"{}\"]\n",
+                        current_node_id, target_id, index
+                    )?;
+                }
+            }
+
+            Statement::Function {
+                name: function_name,
+                function_body,
+            } => {
+                write!(
+                    self.out,
+                    "\tN_{} [label = \"func: {}\"]\n",
+                    current_node_id, function_name
+                )?;
+                self.count += 1;
+
+                let body_id = self.visit_expr(function_body)?;
+
+                write!(self.out, "\tN_{} ->  N_{} \n", current_node_id, body_id)?;
+            }
+            Statement::Expression(expr) => {
+                let _target_id = self.visit_expr(expr);
+                self.count += 1;
+            }
+        }
+
+        Ok(current_node_id)
+    }
+
+    fn visit_expr(&mut self, expr: &Expr) -> Result<u32, Error> {
+        let current_node_id = self.count;
+        match expr {
+            Expr::List(v) => {
+                write!(self.out, "\tN_{} [label = \"<>\"]\n", current_node_id)?;
+                self.count += 1;
+                for (index, node) in v.iter().enumerate() {
+                    let target_id = self.visit_expr(node)?;
+                    write!(
+                        self.out,
+                        "\tN_{} -> N_{} [label = \"{}\"]\n",
+                        current_node_id, target_id, index
+                    )?;
+                }
+            }
+            Expr::Number(n) => {
+                write!(
+                    self.out,
+                    "\tN_{} [label = \"num: {}\"]\n",
+                    current_node_id, n
+                )?;
+                self.count += 1;
+            }
+            Expr::Variable(s) => {
+                write!(
+                    self.out,
+                    "\tN_{} [label = \"var: {}\"]\n",
+                    current_node_id, s
+                )?;
+                self.count += 1;
+            }
+            Expr::BinaryOp {
+                left,
+                operation,
+                right,
+            } => {
+                write!(
+                    self.out,
+                    "\tN_{} [label = \"{:?}\"]\n",
+                    current_node_id, operation
+                )?;
+                self.count += 1;
+
+                let lhs_id = self.visit_expr(left)?;
+                let rhs_id = self.visit_expr(right)?;
+
+                if *operation == BinOp::Power {
+                    write!(
+                        self.out,
+                        "\tN_{0} -> N_{1} [label = \"base\"]\nN_{0} -> N_{2} [label = \"exp\"]\n",
+                        current_node_id, lhs_id, rhs_id
+                    )?;
+                } else {
+                    write!(
+                        self.out,
+                        "\tN_{0} -> N_{1} [label = \"lhs\"]\n\tN_{0} -> N_{2} [label = \"rhs\"]\n",
+                        current_node_id, lhs_id, rhs_id
+                    )?;
+                }
+            }
+
+            Expr::Assignment { holder, value } => {
+                write!(
+                    self.out,
+                    "\tN_{} [label = \"Assignment\"]\n",
+                    current_node_id
+                )?;
+                self.count += 1;
+
+                let holder_id = self.visit_expr(holder)?;
+                let value_id = self.visit_expr(value)?;
+
+                write!(
+                    self.out,
+                    "\tN_{0} -> N_{1} [label = \"holder\"]\n\tN_{0} -> N_{2} [label = \"value\"]\n",
+                    current_node_id, holder_id, value_id
+                )?;
+            }
+
+            Expr::If {
+                condition,
+                body,
+                else_body,
+            } => {
+                write!(self.out, "\tN_{} [label = \"if\"]\n", current_node_id)?;
+                self.count += 1;
+
+                let condition_id = self.visit_expr(condition)?;
+                let body = self.visit_expr(body)?;
+                let else_body = self.visit_expr(else_body)?;
+
+                write!(
+                    self.out,
+                    "\tN_{} -> N_{} [label = \"condition\"]\n",
+                    current_node_id, condition_id
+                )?;
+
+                write!(
+                    self.out,
+                    "\tN_{} -> N_{} [label = \"truthy\"]\n",
+                    current_node_id, body
+                )?;
+                write!(
+                    self.out,
+                    "\tN_{} -> N_{} [label = \"falsy\"]\n",
+                    current_node_id, else_body
+                )?;
+            }
+            Expr::FunctionCall { name, args } => {
+                write!(
+                    self.out,
+                    "\tN_{} [label = \"func_call: {}\"]\n",
+                    current_node_id, name
+                )?;
+                self.count += 1;
+                for (index, node) in args.iter().enumerate() {
+                    let target_id = self.visit_expr(node)?;
+                    write!(
+                        self.out,
+                        "\tN_{} -> N_{} [label = \"{}\"]\n",
+                        current_node_id, target_id, index
+                    )?;
+                }
+            }
+        }
+        Ok(current_node_id)
+    }
 }
