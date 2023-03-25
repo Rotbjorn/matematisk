@@ -54,7 +54,6 @@ pub enum TokenType {
     LeftBrace,
 
     NewLine,
-    EndOfFile, // TODO: Check if not needed?!
 }
 
 impl PartialEq for TokenType {
