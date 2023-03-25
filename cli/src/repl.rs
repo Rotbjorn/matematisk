@@ -28,7 +28,11 @@ pub fn repl() -> Result<(), ReadlineError> {
             continue;
         }
 
-        match parser::Parser::new(lexer::Lexer::new(&input).collect()).parse() {
+
+        let mut parser = parser::Parser::new(lexer::Lexer::new(&input).collect());
+        let result = parser.parse();
+        dbg!(parser.parsed);
+        match result {
             Ok(ast) => {
                 let exit_value = RuntimeVisitor::default().visit_statement(&ast);
 

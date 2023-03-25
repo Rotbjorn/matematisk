@@ -73,6 +73,7 @@ fn main() {
         }
 
         let mut runtime = RuntimeVisitor::default();
+
         let exit_value = runtime.visit_statement(&ast);
 
         println!("EXIT VALUE: {:?}", exit_value);
