@@ -1,6 +1,6 @@
 use std::{fs::File, io::Write, str::FromStr};
 
-use matex_common::node::{Statement, ASTGraphGenerator, Visitor};
+use matex_common::node::{ASTGraphGenerator, Statement, Visitor};
 use matex_compiler::cas::{
     backend::runtime::RuntimeVisitor,
     frontend::{lexer, parser},
@@ -13,7 +13,7 @@ pub fn repl() -> Result<(), ReadlineError> {
     loop {
         let input = rl.readline("matex > ")?.trim().to_string();
 
-        if input.starts_with(":") {
+        if input.starts_with(':') {
             let Ok(command) = input.parse::<Command>() else {
                 eprintln!("Unknown command!");
                 continue;
@@ -27,7 +27,6 @@ pub fn repl() -> Result<(), ReadlineError> {
             }
             continue;
         }
-
 
         let mut parser = parser::Parser::new(lexer::Lexer::new(&input).collect());
         let result = parser.parse();
@@ -53,10 +52,10 @@ pub struct Command {
 }
 
 impl Command {
-    pub fn new(command_type: CommandType, input: &String) -> Self {
+    pub fn new(command_type: CommandType, input: &str) -> Self {
         Self {
             cmd_type: command_type,
-            input: input.clone(),
+            input: input.to_owned(),
         }
     }
 
@@ -83,7 +82,9 @@ impl Command {
 
                 let mut graph_buf = String::new();
 
-                ASTGraphGenerator::new(&mut graph_buf).create_dot_graph(&ast).expect("Failed to create graph");
+                ASTGraphGenerator::new(&mut graph_buf)
+                    .create_dot_graph(&ast)
+                    .expect("Failed to create graph");
 
                 println!("Graph generated --- \n{}", graph_buf);
 
@@ -106,7 +107,7 @@ impl Command {
                     return Err(());
                 };
 
-        return Ok(ast);
+        Ok(ast)
     }
 }
 
@@ -119,13 +120,13 @@ impl FromStr for Command {
     type Err = ();
 
     fn from_str(input: &str) -> Result<Self, Self::Err> {
-        let input = input.strip_prefix(":").ok_or(())?;
+        let input = input.strip_prefix(':').ok_or(())?;
 
         let (command, args) = input.split_once(' ').ok_or(())?;
 
         let command = command.parse::<CommandType>()?;
 
-        Ok(Command::new(command, &args.to_string()))
+        Ok(Command::new(command, &args))
     }
 }
 
