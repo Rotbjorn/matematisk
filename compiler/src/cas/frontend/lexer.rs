@@ -34,26 +34,22 @@ impl Lexer {
         if ch.is_alphabetic() {
             let identifier = self.collect_while(|c| c.is_alphabetic());
             // TODO: Extract out from the next_token function, also change to something that allows for I18N?
-            let keyword_type = match identifier.as_str() {
-                "if" => Some(KeywordType::If),
-                "else" => Some(KeywordType::Else),
-                _ => None,
-            };
-            if let Some(keyword) = keyword_type {
+            let keyword = identifier.parse::<KeywordType>().ok();
+
+            if let Some(keyword) = keyword {
                 return Some(Token::new(TokenType::Keyword(keyword), self.pos));
             } else {
                 return Some(Token::new(TokenType::Identifier(identifier), self.pos));
             }
         }
 
-        if let Some(token) = self.special_char() {
-            return Some(token);
-        }
-        eprintln!(
-            "Unhandled character: '{}', Code: {}, Idx: {}",
-            ch, ch as usize, self.idx
-        );
-        None
+        self.special_char().or_else(|| {
+            eprintln!(
+                "Unhandled character: '{}', Code: {}, Idx: {}",
+                ch, ch as usize, self.idx
+            );
+            None
+        })
     }
 
     // TODO: Use something else
