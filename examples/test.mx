@@ -1,6 +1,7 @@
-abs(x: real) = 2*x + 5 * 3
+abs(x: real) = if x > 0 x else -x
 abs(q: integer) = if q > 0 (2*3)^5 else 2 
 test(l: donkey) = 20
 
-x = 7*5
-x = test(13)
+
+x = 5*3 + y + 3
+x
