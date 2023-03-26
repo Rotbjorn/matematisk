@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use std::{fmt::Display, str::FromStr};
 
 use crate::util::Position;
 
@@ -66,4 +66,18 @@ impl PartialEq for TokenType {
 pub enum KeywordType {
     If,
     Else,
+    Simplify,
+}
+
+impl FromStr for KeywordType {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "if" => Ok(KeywordType::If),
+            "else" => Ok(KeywordType::Else),
+            "simplify" => Ok(KeywordType::Simplify),
+            _ => Err(()),
+        }
+    }
 }
