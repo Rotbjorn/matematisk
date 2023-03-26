@@ -18,6 +18,7 @@ impl REPL {
 
         loop {
             let input = rl.readline("matex > ")?.trim().to_string();
+            rl.add_history_entry(&input)?;
 
             if input.starts_with(':') {
                 let Ok(command) = input.parse::<Command>() else {
