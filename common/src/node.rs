@@ -20,7 +20,7 @@ pub enum Expr {
 
     // Currently only negation unary (-expr)
     Unary(Box<Expr>),
-    
+
     Simplify(Box<Expr>),
 
     BinaryOp {
@@ -170,10 +170,7 @@ impl<'a, W: Write> Visitor<Result<u32, Error>> for ASTGraphGenerator<'a, W> {
                 }
             }
 
-            Statement::Function {
-                name,
-                body,
-            } => {
+            Statement::Function { name, body } => {
                 self.create_node(&format!("func: {}", name))?;
 
                 let body = self.visit_expr(body)?;
