@@ -7,7 +7,7 @@ type Statements = Vec<Statement>;
 #[derive(Debug, Clone)]
 pub enum Statement {
     Program(Statements),
-    Function { name: String, function_body: Expr },
+    Function { name: String, body: Expr },
     Expression(Expr),
 }
 
@@ -18,7 +18,11 @@ pub enum Expr {
 
     List(Vec<Expr>),
 
-    // TODO: Break into addition, multiply, power
+    // Currently only negation unary (-expr)
+    Unary(Box<Expr>),
+    
+    Simplify(Box<Expr>),
+
     BinaryOp {
         left: Box<Expr>,
         operation: BinOp,
@@ -133,115 +137,123 @@ impl<'a, W: Write> ASTGraphGenerator<'a, W> {
 
         Ok(())
     }
+
+    fn create_node(&mut self, label: &str) -> GraphResult<u32> {
+        writeln!(self.out, "\tN_{} [label = \"{}\"]", self.count, label)?;
+        self.count += 1;
+        Ok(self.count)
+    }
+
+    fn create_edge(&mut self, from: u32, to: u32) -> GraphResult<()> {
+        writeln!(self.out, "\tN_{} -> N_{}", from, to)?;
+        Ok(())
+    }
+
+    fn create_edge_label(&mut self, from: u32, to: u32, label: &str) -> GraphResult<()> {
+        writeln!(self.out, "\tN_{} -> N_{} [label = \"{}\"]", from, to, label)?;
+        Ok(())
+    }
 }
 
+type GraphResult<T> = Result<T, Error>;
 // TODO: There is a library for creating Graphviz dot files!
 impl<'a, W: Write> Visitor<Result<u32, Error>> for ASTGraphGenerator<'a, W> {
     fn visit_statement(&mut self, statement: &Statement) -> Result<u32, Error> {
-        let current_node_id = self.count;
+        let current = self.count;
         match statement {
             Statement::Program(v) => {
-                writeln!(self.out, "\tN_{} [label = \"<>\"]", current_node_id)?;
-                self.count += 1;
-                for (index, node) in v.iter().enumerate() {
-                    let target_id = self.visit_statement(node)?;
-                    writeln!(
-                        self.out,
-                        "\tN_{} -> N_{} [label = \"{}\"]",
-                        current_node_id, target_id, index
-                    )?;
+                self.create_node("<>")?;
+
+                for (index, statement) in v.iter().enumerate() {
+                    let node = self.visit_statement(statement)?;
+                    self.create_edge_label(current, node, &index.to_string())?;
                 }
             }
 
             Statement::Function {
-                name: function_name,
-                function_body,
+                name,
+                body,
             } => {
-                writeln!(
-                    self.out,
-                    "\tN_{} [label = \"func: {}\"]",
-                    current_node_id, function_name
-                )?;
-                self.count += 1;
+                self.create_node(&format!("func: {}", name))?;
 
-                let body_id = self.visit_expr(function_body)?;
+                let body = self.visit_expr(body)?;
 
-                writeln!(self.out, "\tN_{} ->  N_{}", current_node_id, body_id)?;
+                self.create_edge(current, body)?;
             }
             Statement::Expression(expr) => {
-                let _target_id = self.visit_expr(expr);
+                self.visit_expr(expr)?;
                 self.count += 1;
             }
         }
 
-        Ok(current_node_id)
+        Ok(current)
     }
 
     fn visit_expr(&mut self, expr: &Expr) -> Result<u32, Error> {
-        let current_node_id = self.count;
+        let current = self.count;
         match expr {
             Expr::List(v) => {
-                writeln!(self.out, "\tN_{} [label = \"<>\"]", current_node_id)?;
-                self.count += 1;
+                self.create_node("<>")?;
+
                 for (index, node) in v.iter().enumerate() {
-                    let target_id = self.visit_expr(node)?;
-                    writeln!(
-                        self.out,
-                        "\tN_{} -> N_{} [label = \"{}\"]\n",
-                        current_node_id, target_id, index
-                    )?;
+                    let node = self.visit_expr(node)?;
+                    self.create_edge_label(current, node, &index.to_string())?;
                 }
             }
             Expr::Number(n) => {
-                writeln!(self.out, "\tN_{} [label = \"num: {}\"]", current_node_id, n)?;
-                self.count += 1;
+                self.create_node(&format!("num: {}", n))?;
             }
-            Expr::Variable(s) => {
-                writeln!(self.out, "\tN_{} [label = \"var: {}\"]", current_node_id, s)?;
-                self.count += 1;
+            Expr::Variable(name) => {
+                self.create_node(&format!("var: {}", name))?;
+            }
+            Expr::Unary(expr) => {
+                self.create_node("unary (-)")?;
+
+                let expr = self.visit_expr(expr)?;
+
+                self.create_edge(current, expr)?;
+            }
+            Expr::Simplify(expr) => {
+                self.create_node("simplify")?;
+
+                let expr = self.visit_expr(expr)?;
+
+                self.create_edge(current, expr)?;
             }
             Expr::BinaryOp {
                 left,
                 operation,
                 right,
             } => {
-                writeln!(
-                    self.out,
-                    "\tN_{} [label = \"{:?}\"]",
-                    current_node_id, operation
-                )?;
-                self.count += 1;
+                self.create_node(&format!("{:?}", operation))?;
 
-                let lhs_id = self.visit_expr(left)?;
-                let rhs_id = self.visit_expr(right)?;
+                let left = self.visit_expr(left)?;
+                let right = self.visit_expr(right)?;
 
-                if *operation == BinOp::Power {
-                    writeln!(
-                        self.out,
-                        "\tN_{0} -> N_{1} [label = \"base\"]\nN_{0} -> N_{2} [label = \"exp\"]",
-                        current_node_id, lhs_id, rhs_id
-                    )?;
-                } else {
-                    writeln!(
-                        self.out,
-                        "\tN_{0} -> N_{1} [label = \"lhs\"]\n\tN_{0} -> N_{2} [label = \"rhs\"]",
-                        current_node_id, lhs_id, rhs_id
-                    )?;
+                match *operation {
+                    BinOp::Power => {
+                        self.create_edge_label(current, left, "base")?;
+                        self.create_edge_label(current, right, "exponent")?;
+                    }
+                    BinOp::Divide => {
+                        self.create_edge_label(current, left, "numer")?;
+                        self.create_edge_label(current, right, "denom")?;
+                    }
+                    _ => {
+                        self.create_edge_label(current, left, "lhs")?;
+                        self.create_edge_label(current, right, "rhs")?;
+                    }
                 }
             }
 
             Expr::Assignment { holder, value } => {
-                writeln!(self.out, "\tN_{} [label = \"Assignment\"]", current_node_id)?;
-                self.count += 1;
+                self.create_node("Assignment")?;
 
-                let holder_id = self.visit_expr(holder)?;
-                let value_id = self.visit_expr(value)?;
+                let holder = self.visit_expr(holder)?;
+                let value = self.visit_expr(value)?;
 
-                writeln!(
-                    self.out,
-                    "\tN_{0} -> N_{1} [label = \"holder\"]\n\tN_{0} -> N_{2} [label = \"value\"]",
-                    current_node_id, holder_id, value_id
-                )?;
+                self.create_edge_label(current, holder, "holder")?;
+                self.create_edge_label(current, value, "value")?;
             }
 
             Expr::If {
@@ -249,47 +261,26 @@ impl<'a, W: Write> Visitor<Result<u32, Error>> for ASTGraphGenerator<'a, W> {
                 body,
                 else_body,
             } => {
-                writeln!(self.out, "\tN_{} [label = \"if\"]\n", current_node_id)?;
-                self.count += 1;
+                self.create_node("if")?;
 
-                let condition_id = self.visit_expr(condition)?;
+                let condition = self.visit_expr(condition)?;
                 let body = self.visit_expr(body)?;
                 let else_body = self.visit_expr(else_body)?;
 
-                writeln!(
-                    self.out,
-                    "\tN_{} -> N_{} [label = \"condition\"]",
-                    current_node_id, condition_id
-                )?;
+                self.create_edge_label(current, condition, "condition")?;
 
-                writeln!(
-                    self.out,
-                    "\tN_{} -> N_{} [label = \"truthy\"]",
-                    current_node_id, body
-                )?;
-                writeln!(
-                    self.out,
-                    "\tN_{} -> N_{} [label = \"falsy\"]",
-                    current_node_id, else_body
-                )?;
+                self.create_edge_label(current, body, "truthy")?;
+                self.create_edge_label(current, else_body, "falsy")?;
             }
             Expr::FunctionCall { name, args } => {
-                writeln!(
-                    self.out,
-                    "\tN_{} [label = \"func_call: {}\"]",
-                    current_node_id, name
-                )?;
-                self.count += 1;
+                self.create_node(&format!("func_call: {}", name))?;
+
                 for (index, node) in args.iter().enumerate() {
                     let target_id = self.visit_expr(node)?;
-                    writeln!(
-                        self.out,
-                        "\tN_{} -> N_{} [label = \"{}\"]",
-                        current_node_id, target_id, index
-                    )?;
+                    self.create_edge_label(current, target_id, &index.to_string())?;
                 }
             }
         }
-        Ok(current_node_id)
+        Ok(current)
     }
 }
