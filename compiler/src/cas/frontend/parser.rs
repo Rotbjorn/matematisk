@@ -140,7 +140,7 @@ impl Parser {
 
         Ok(Statement::Function {
             name: func_name,
-            function_body,
+            body: function_body,
         })
     }
 
@@ -165,7 +165,7 @@ impl Parser {
             TokenType::Number(_) => self.parse_number()?,
             TokenType::Identifier(_) => self.parse_identifier()?,
             TokenType::Keyword(kw) => self.parse_keyword(kw)?,
-            TokenType::Minus => todo!("Implement unary"),
+            TokenType::Minus => self.parse_unary_minus()?,
             TokenType::LeftParenthesis => self.parse_grouping()?,
             TokenType::LeftSquareBracket => todo!("Implement lists"),
             TokenType::RightSquareBracket => todo!("Implement lists"),
@@ -217,17 +217,28 @@ impl Parser {
 
     fn parse_keyword(&mut self, kw: KeywordType) -> ParseResult<Expr> {
         // Expect Keyword type ideally....
-        self.consume()?;
 
         let expr = match kw {
             KeywordType::If => self.parse_if()?,
-            KeywordType::Else => todo!(),
+            KeywordType::Simplify => self.parse_simplify()?,
+            _ => {
+                todo!("Shitbucket");
+            }
         };
 
         Ok(expr)
     }
+    fn parse_simplify(&mut self) -> ParseResult<Expr> {
+        self.expect_keyword(KeywordType::Simplify, "Expected simplify keyword")?;
+
+        let expr = self.parse_expression()?;
+
+        Ok(Expr::Simplify(Box::new(expr)))
+    }
 
     fn parse_if(&mut self) -> ParseResult<Expr> {
+        self.expect_keyword(KeywordType::If, "Expected if")?;
+
         let condition = Box::new(self.parse_expression()?);
 
         let body = Box::new(self.parse_expression()?);
@@ -372,6 +383,14 @@ impl Parser {
             holder: Box::new(holder),
             value: Box::new(value),
         })
+    }
+
+    fn parse_unary_minus(&mut self) -> ParseResult<Expr> {
+        self.expect(TokenType::Minus, "Expected unary minus before expression")?;
+
+        let expr = self.parse_expression()?;
+
+        Ok(Expr::Unary(Box::new(expr)))
     }
 }
 
