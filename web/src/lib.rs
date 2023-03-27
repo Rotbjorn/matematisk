@@ -5,10 +5,9 @@ pub use app::MatexApp;
 
 use eframe::wasm_bindgen::prelude::wasm_bindgen;
 use matex_compiler::cas::{
-    backend::runtime::{Runtime, RuntimeVal},
+    backend::{runtime::{Runtime}, format::{NormalFormatter, ValueFormatter}},
     frontend::{lexer::Lexer, parser::Parser},
 };
-use wasm_bindgen::convert::IntoWasmAbi;
 
 #[wasm_bindgen]
 pub fn new_debug_app(canvas_id: String) {
@@ -35,8 +34,8 @@ pub fn run(source: String) -> String {
     match parser.parse() {
         Ok(program) => {
             let mut rt = Runtime::default();
-            let value = rt.run(program);
-            let str_value = format!("{:?}", value);
+            let value = rt.run(&program);
+            let str_value = format!("{}", NormalFormatter::format(&value));
             return str_value;
         }
         Err(_) => "error".to_owned(),

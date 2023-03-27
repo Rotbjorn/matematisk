@@ -45,7 +45,7 @@ impl App for MatexApp {
 
             if ui.button("Run").clicked() {
                 if let Ok(program) = Parser::new(Lexer::new(&self.source).collect()).parse() {
-                    let last_value = self.runtime.run(program);
+                    let last_value = self.runtime.run(&program);
                     self.executed
                         .push((self.source.clone(), format!("{:?}", last_value)));
                     self.source.clear();
