@@ -13,7 +13,7 @@ pub struct Runtime {
 }
 
 impl Runtime {
-    pub fn run(&mut self, program: Statement) -> RuntimeVal {
+    pub fn run(&mut self, program: &Statement) -> RuntimeVal {
         let Statement::Program(v) = program else {
             return RuntimeVal::Unit;
         };
