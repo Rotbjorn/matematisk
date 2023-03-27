@@ -1,9 +1,8 @@
 use super::runtime::RuntimeVal;
 
-
 pub trait ValueFormatter {
     fn format(value: &RuntimeVal) -> String;
-} 
+}
 
 pub struct NormalFormatter;
 
@@ -12,7 +11,7 @@ impl ValueFormatter for NormalFormatter {
         use RuntimeVal::*;
         match value {
             Unit => "Unit value".to_owned(),
-            Number(n) => n.to_string(), 
+            Number(n) => n.to_string(),
             Symbol(s) => s.to_string(),
             Bool(b) => b.to_string(),
             Sum(terms) => {
@@ -22,7 +21,7 @@ impl ValueFormatter for NormalFormatter {
                     string.push('+');
                 }
                 return string;
-            },
+            }
             Product(factors) => {
                 let mut string = String::new();
                 for term in factors {

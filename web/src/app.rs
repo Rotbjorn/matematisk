@@ -1,5 +1,5 @@
 use eframe::App;
-use egui::{Ui, TextEdit};
+use egui::{TextEdit, Ui};
 use matex_compiler::cas::{
     backend::runtime::Runtime,
     frontend::{lexer::Lexer, parser::Parser},
@@ -34,7 +34,6 @@ impl Default for MatexApp {
 
 impl App for MatexApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-
         egui::Window::new("REPL").show(ctx, |ui| {
             self.render_executions(ui);
             /*
@@ -42,8 +41,7 @@ impl App for MatexApp {
             visuals.panel_fill = Color32::DARK_RED;
             ctx.set_visuals(visuals);
             */
-            TextEdit::multiline(&mut self.source)
-                .show(ui);
+            TextEdit::multiline(&mut self.source).show(ui);
 
             if ui.button("Run").clicked() {
                 if let Ok(program) = Parser::new(Lexer::new(&self.source).collect()).parse() {
@@ -53,7 +51,6 @@ impl App for MatexApp {
                     self.source.clear();
                 }
             }
-
 
             /*
             let sin: PlotPoints = (0..1000).map(|i| {

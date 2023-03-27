@@ -22,9 +22,9 @@ impl REPL {
 
             if input.starts_with(':') {
                 let Ok(command) = input.parse::<Command>() else {
-                eprintln!("Unknown command!");
-                continue;
-            };
+                    eprintln!("Unknown command!");
+                    continue;
+                };
 
                 let result = command.execute();
 

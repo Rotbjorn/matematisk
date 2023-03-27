@@ -164,7 +164,7 @@ impl Visitor<RuntimeVal> for Runtime {
                 expr.simplify();
                 dbg!(&expr);
 
-                return expr
+                return expr;
             }
             Expr::BinaryOp {
                 left,
@@ -200,8 +200,8 @@ pub enum RuntimeVal {
 
 impl RuntimeVal {
     pub fn format<T: ValueFormatter>(&self) {
-        T::format(self); 
-    } 
+        T::format(self);
+    }
 
     fn add(mut self, mut other: RuntimeVal) -> RuntimeVal {
         use RuntimeVal::*;
@@ -216,8 +216,7 @@ impl RuntimeVal {
                 v.push(other);
                 return self;
             }
-            
-            
+
             (_, Sum(v)) => {
                 v.push(self);
                 return other;
@@ -239,7 +238,7 @@ impl RuntimeVal {
             | (Exponent(_, _), Product(_))
             | (Exponent(_, _), Exponent(_, _)) => {
                 return RuntimeVal::Sum(vec![self, other]);
-            } 
+            }
         }
     }
     fn multiply(mut self, mut other: RuntimeVal) -> RuntimeVal {
@@ -255,7 +254,7 @@ impl RuntimeVal {
                 v.push(other);
                 return self;
             }
-            
+
             (_, Product(v)) => {
                 v.push(self);
                 return other;
@@ -277,7 +276,7 @@ impl RuntimeVal {
             | (Exponent(_, _), Sum(_))
             | (Exponent(_, _), Exponent(_, _)) => {
                 return RuntimeVal::Product(vec![self, other]);
-            } 
+            }
         }
     }
     fn power(self, other: RuntimeVal) -> RuntimeVal {
@@ -315,7 +314,6 @@ impl RuntimeVal {
             | (Exponent(_, _), Exponent(_, _)) => {
                 return Exponent(Box::new(self), Box::new(other));
             }
-
         }
     }
     fn less(self, other: RuntimeVal) -> RuntimeVal {

@@ -4,7 +4,10 @@ mod app;
 pub use app::MatexApp;
 
 use eframe::wasm_bindgen::prelude::wasm_bindgen;
-use matex_compiler::cas::{backend::runtime::{RuntimeVal, Runtime}, frontend::{parser::Parser, lexer::Lexer}};
+use matex_compiler::cas::{
+    backend::runtime::{Runtime, RuntimeVal},
+    frontend::{lexer::Lexer, parser::Parser},
+};
 use wasm_bindgen::convert::IntoWasmAbi;
 
 #[wasm_bindgen]
@@ -18,9 +21,11 @@ pub fn new_debug_app(canvas_id: String) {
     wasm_bindgen_futures::spawn_local(async move {
         eframe::start_web(
             canvas_id.as_str(),
-            web_options, 
-            Box::new(|_cc| Box::new(MatexApp::default()))
-        ).await.expect("Failed to initialise eframe");
+            web_options,
+            Box::new(|_cc| Box::new(MatexApp::default())),
+        )
+        .await
+        .expect("Failed to initialise eframe");
     });
 }
 
