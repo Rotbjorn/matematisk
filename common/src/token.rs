@@ -66,6 +66,7 @@ impl PartialEq for TokenType {
 pub enum KeywordType {
     If,
     Else,
+    Then,
     Simplify,
 }
 
@@ -76,6 +77,7 @@ impl FromStr for KeywordType {
         match s {
             "if" => Ok(KeywordType::If),
             "else" => Ok(KeywordType::Else),
+            "then" => Ok(KeywordType::Then),
             "simplify" => Ok(KeywordType::Simplify),
             _ => Err(()),
         }

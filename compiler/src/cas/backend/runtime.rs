@@ -4,6 +4,8 @@ use matex_common::node::{BinOp, Expr, Statement};
 
 use matex_common::node::Visitor;
 
+use super::format::ValueFormatter;
+
 #[derive(Default)]
 pub struct Runtime {
     functions: HashMap<String, Expr>,
@@ -197,18 +199,28 @@ pub enum RuntimeVal {
 }
 
 impl RuntimeVal {
-    fn add(self, other: RuntimeVal) -> RuntimeVal {
+    pub fn format<T: ValueFormatter>(&self) {
+        T::format(self); 
+    } 
+
+    fn add(mut self, mut other: RuntimeVal) -> RuntimeVal {
         use RuntimeVal::*;
-        match (self, other) {
+        match (&mut self, &mut other) {
             (Unit, _) | (_, Unit) => panic!("Unit error when adding"),
 
             (Bool(_), _) | (_, Bool(_)) => panic!("No addition with booleans"),
 
-            (Number(lhs), Number(rhs)) => Number(lhs + rhs),
+            (Number(lhs), Number(rhs)) => Number(lhs.deref() + rhs.deref()),
 
-            (Sum(mut v), other) | (other, Sum(mut v)) => {
+            (Sum(v), _) => {
                 v.push(other);
-                return RuntimeVal::Sum(v);
+                return self;
+            }
+            
+            
+            (_, Sum(v)) => {
+                v.push(self);
+                return other;
             }
 
             (Number(_), Symbol(_))
@@ -230,18 +242,23 @@ impl RuntimeVal {
             } 
         }
     }
-    fn multiply(self, other: RuntimeVal) -> RuntimeVal {
+    fn multiply(mut self, mut other: RuntimeVal) -> RuntimeVal {
         use RuntimeVal::*;
-        match (self, other) {
+        match (&mut self, &mut other) {
             (Unit, _) | (_, Unit) => panic!("Unit error when multiplicating"),
 
             (Bool(_), _) | (_, Bool(_)) => panic!("No multiplication with booleans"),
 
-            (Number(lhs), Number(rhs)) => Number(lhs * rhs),
+            (Number(lhs), Number(rhs)) => Number(lhs.deref() * rhs.deref()),
 
-            (Product(mut v), other) | (other, Product(mut v)) => {
+            (Product(v), _) => {
                 v.push(other);
-                return RuntimeVal::Product(v);
+                return self;
+            }
+            
+            (_, Product(v)) => {
+                v.push(self);
+                return other;
             }
 
             (Number(_), Symbol(_))
@@ -265,12 +282,12 @@ impl RuntimeVal {
     }
     fn power(self, other: RuntimeVal) -> RuntimeVal {
         use RuntimeVal::*;
-        match (self, other) {
+        match (&self, &other) {
             (Unit, _) | (_, Unit) => panic!("Unit error when powering"),
 
             (Bool(_), _) | (_, Bool(_)) => panic!("No powering with booleans"),
 
-            (Number(lhs), Number(rhs)) => Number(lhs.powf(rhs)),
+            (Number(lhs), Number(rhs)) => Number(lhs.powf(*rhs)),
 
             (Number(_), Symbol(_))
             | (Number(_), Sum(_))
