@@ -1,5 +1,5 @@
 use eframe::App;
-use egui::{Ui, plot::{Plot, Line, PlotPoints}, Frame, Color32, Visuals, Stroke, TextEdit};
+use egui::{Ui, TextEdit};
 use matex_compiler::cas::{
     backend::runtime::Runtime,
     frontend::{lexer::Lexer, parser::Parser},
@@ -15,8 +15,8 @@ pub struct MatexApp {
 impl MatexApp {
     fn render_executions(&self, ui: &mut Ui) {
         for (source, output) in &self.executed {
-            ui.label(source);
-            ui.label(output);
+            ui.label("i> ".to_owned() + source);
+            ui.label("o>".to_owned() + output);
             ui.separator();
         }
     }
@@ -35,7 +35,7 @@ impl Default for MatexApp {
 impl App for MatexApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
 
-        egui::SidePanel::right("my-right-panel").default_width(300.0).show(ctx, |ui| {
+        egui::Window::new("REPL").show(ctx, |ui| {
             self.render_executions(ui);
             /*
             let mut visuals = Visuals::default();
@@ -54,6 +54,8 @@ impl App for MatexApp {
                 }
             }
 
+
+            /*
             let sin: PlotPoints = (0..1000).map(|i| {
                 let x = i as f64 * 0.1;
                 [x, x.sin()]
@@ -65,19 +67,6 @@ impl App for MatexApp {
             Plot::new("test-plot").show_background(false).show(ui, |plot_ui| {
                 plot_ui.line(line)
             });
-
-            /*
-             ui.heading("My egui Application");
-             ui.horizontal(|ui| {
-                 let name_label = ui.label("Your name: ");
-                 ui.text_edit_singleline(&mut self.name)
-                     .labelled_by(name_label.id);
-             });
-             ui.add(egui::Slider::new(&mut self.age, 0..=120).text("age"));
-             if ui.button("Click each year").clicked() {
-                 self.age += 1;
-             }
-             ui.label(format!("Hello '{}', age {}", self.name, self.age));
             */
         });
     }

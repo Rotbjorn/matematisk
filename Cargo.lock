@@ -1318,7 +1318,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "matex-gui"
+name = "matex-web"
 version = "0.1.0"
 dependencies = [
  "console_error_panic_hook",
@@ -1326,6 +1326,7 @@ dependencies = [
  "egui",
  "matex-compiler",
  "tracing-wasm",
+ "wasm-bindgen",
  "wasm-bindgen-futures",
 ]
 

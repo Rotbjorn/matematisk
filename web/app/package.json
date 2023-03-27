@@ -1,0 +1,29 @@
+{
+	"name": "app",
+	"version": "0.0.1",
+	"private": true,
+	"scripts": {
+		"cleanbuild": "wasm-pack build ../ && npm run build && npm run preview",
+		"dev": "vite dev",
+		"build": "vite build",
+		"preview": "vite preview",
+		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch"
+	},
+	"devDependencies": {
+		"@sveltejs/adapter-auto": "^2.0.0",
+		"@sveltejs/adapter-static": "^2.0.1",
+		"@sveltejs/kit": "^1.5.0",
+		"svelte": "^3.54.0",
+		"svelte-check": "^3.0.1",
+		"tslib": "^2.4.1",
+		"typescript": "^5.0.0",
+		"vite": "^4.2.0",
+		"vite-plugin-top-level-await": "^1.3.0",
+		"vite-plugin-wasm": "^3.2.2"
+	},
+	"type": "module",
+	"dependencies": {
+		"matex-web": "file:../pkg"
+	}
+}
