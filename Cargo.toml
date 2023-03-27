@@ -1,7 +1,8 @@
 [workspace]
 
 members = [
+    "cli",
     "common",
     "compiler",
-    "cli",
+    "gui",
 ]
