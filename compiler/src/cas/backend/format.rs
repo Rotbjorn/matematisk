@@ -15,20 +15,18 @@ impl ValueFormatter for NormalFormatter {
             Symbol(s) => s.to_string(),
             Bool(b) => b.to_string(),
             Sum(terms) => {
-                let mut string = String::new();
+                let mut vec = Vec::new();
                 for term in terms {
-                    string.push_str(&Self::format(term));
-                    string.push('+');
+                    vec.push(Self::format(term));
                 }
-                return string;
+                return vec.join("+");
             }
             Product(factors) => {
-                let mut string = String::new();
-                for term in factors {
-                    string.push_str(&Self::format(term));
-                    string.push('*');
+                let mut vec = Vec::new();
+                for factor in factors {
+                    vec.push(Self::format(factor));
                 }
-                return string;
+                return vec.join("*");
             }
             Exponent(base, exp) => {
                 let base_str = Self::format(base);
