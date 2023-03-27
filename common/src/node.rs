@@ -106,6 +106,8 @@ pub enum Precedence {
     Comparison,
     Term,
     Factor,
+    // TODO: Verify precedence, -2^3 or (-2)^3?
+    Unary,
     Exponent,
 }
 

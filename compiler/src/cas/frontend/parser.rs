@@ -222,7 +222,7 @@ impl Parser {
             KeywordType::If => self.parse_if()?,
             KeywordType::Simplify => self.parse_simplify()?,
             _ => {
-                todo!("Shitbucket");
+                panic!("Unhandled: {:?}", kw);
             }
         };
 
@@ -240,8 +240,12 @@ impl Parser {
         self.expect_keyword(KeywordType::If, "Expected if")?;
 
         let condition = Box::new(self.parse_expression()?);
+        dbg!(&condition);
+
+        self.expect_keyword(KeywordType::Then, "Expected then after if condition.")?;
 
         let body = Box::new(self.parse_expression()?);
+        dbg!(&body);
 
         self.expect_keyword(KeywordType::Else, "Expected else after if body.")?;
 
@@ -388,7 +392,7 @@ impl Parser {
     fn parse_unary_minus(&mut self) -> ParseResult<Expr> {
         self.expect(TokenType::Minus, "Expected unary minus before expression")?;
 
-        let expr = self.parse_expression()?;
+        let expr = self.parse_precedence(Precedence::Unary)?;
 
         Ok(Expr::Unary(Box::new(expr)))
     }
