@@ -11,6 +11,15 @@ pub struct Runtime {
 }
 
 impl Runtime {
+    pub fn run(&mut self, program: Statement) -> RuntimeVal {
+        let Statement::Program(v) = program else {
+            return RuntimeVal::Unit;
+        };
+        self.visit_program(&v)
+    }
+}
+
+impl Runtime {
     fn visit_program(&mut self, statements: &Vec<Statement>) -> RuntimeVal {
         let mut value = RuntimeVal::Number(-1.0);
         for statement in statements {
