@@ -41,7 +41,7 @@ impl Runtime {
         if let Some(variable) = self.variables.get(name) {
             variable.clone()
         } else {
-            RuntimeVal::Expression(name.clone().into())
+            RuntimeVal::Symbol(name.clone())
         }
     }
 
@@ -157,16 +157,12 @@ impl Visitor<RuntimeVal> for Runtime {
             Expr::List(_) => todo!("Not handling List"),
             Expr::Unary(expr) => self.visit_unary_operation(expr),
             Expr::Simplify(expr) => {
-                let expr = self.visit_expr(expr);
+                let mut expr = self.visit_expr(expr);
 
-                match expr {
-                    RuntimeVal::Expression(mut expr) => {
-                        expr.simplify();
-                        dbg!(&expr);
-                        return expr.into();
-                    }
-                    _ => panic!("Can't simplify non expression"),
-                }
+                expr.simplify();
+                dbg!(&expr);
+
+                return expr
             }
             Expr::BinaryOp {
                 left,
@@ -191,164 +187,118 @@ pub enum RuntimeVal {
 
     // TODO: Add complex, real, etc
     Number(f64),
+    Symbol(String),
+
     Bool(bool),
 
-    Expression(AlgebraExpr),
+    Sum(Vec<RuntimeVal>),
+    Product(Vec<RuntimeVal>),
+    Exponent(Box<RuntimeVal>, Box<RuntimeVal>),
 }
 
 impl RuntimeVal {
     fn add(self, other: RuntimeVal) -> RuntimeVal {
+        use RuntimeVal::*;
         match (self, other) {
-            (RuntimeVal::Number(lhs), RuntimeVal::Number(rhs)) => RuntimeVal::Number(lhs + rhs),
-            (RuntimeVal::Number(lhs), RuntimeVal::Expression(mut rhs))
-            | (RuntimeVal::Expression(mut rhs), RuntimeVal::Number(lhs)) => match &mut rhs {
-                AlgebraExpr::Sum(v) => {
-                    v.push(lhs.into());
-                    return rhs.into();
-                }
-                AlgebraExpr::Product(_) | AlgebraExpr::Exponent(_, _) | AlgebraExpr::Symbol(_) => {
-                    AlgebraExpr::Sum(vec![lhs.into(), rhs]).into()
-                }
+            (Unit, _) | (_, Unit) => panic!("Unit error when adding"),
 
-                AlgebraExpr::Number(_) => todo!("If this happens I don't know..."),
-            },
-            (RuntimeVal::Number(_), RuntimeVal::Bool(_)) => todo!(),
+            (Bool(_), _) | (_, Bool(_)) => panic!("No addition with booleans"),
 
-            (RuntimeVal::Expression(mut lhs), RuntimeVal::Expression(mut rhs)) => {
-                match (&mut lhs, &mut rhs) {
-                    (AlgebraExpr::Sum(lhs_v), AlgebraExpr::Sum(rhs_v)) => {
-                        lhs_v.append(rhs_v);
-                        return lhs.into();
-                    }
+            (Number(lhs), Number(rhs)) => Number(lhs + rhs),
 
-                    (AlgebraExpr::Sum(lhs_v), AlgebraExpr::Product(_))
-                    | (AlgebraExpr::Sum(lhs_v), AlgebraExpr::Exponent(_, _))
-                    | (AlgebraExpr::Sum(lhs_v), AlgebraExpr::Number(_))
-                    | (AlgebraExpr::Sum(lhs_v), AlgebraExpr::Symbol(_)) => {
-                        lhs_v.push(rhs);
-                        return lhs.into();
-                    }
-
-                    (AlgebraExpr::Product(_), AlgebraExpr::Sum(rhs_v))
-                    | (AlgebraExpr::Number(_), AlgebraExpr::Sum(rhs_v))
-                    | (AlgebraExpr::Symbol(_), AlgebraExpr::Sum(rhs_v))
-                    | (AlgebraExpr::Exponent(_, _), AlgebraExpr::Sum(rhs_v)) => {
-                        rhs_v.push(lhs);
-                        return rhs.into();
-                    }
-
-                    _ => {
-                        return AlgebraExpr::Sum(vec![lhs, rhs]).into();
-                    }
-                }
+            (Sum(mut v), other) | (other, Sum(mut v)) => {
+                v.push(other);
+                return RuntimeVal::Sum(v);
             }
 
-            (RuntimeVal::Expression(_), RuntimeVal::Bool(_)) => todo!(),
-            (RuntimeVal::Unit, RuntimeVal::Unit) => todo!(),
-            (RuntimeVal::Unit, RuntimeVal::Number(_)) => todo!(),
-            (RuntimeVal::Unit, RuntimeVal::Expression(_)) => todo!(),
-            (RuntimeVal::Unit, RuntimeVal::Bool(_)) => todo!(),
-            (RuntimeVal::Number(_), RuntimeVal::Unit) => todo!(),
-            (RuntimeVal::Expression(_), RuntimeVal::Unit) => todo!(),
-            (RuntimeVal::Bool(_), RuntimeVal::Unit) => todo!(),
-            (RuntimeVal::Bool(_), RuntimeVal::Number(_)) => todo!(),
-            (RuntimeVal::Bool(_), RuntimeVal::Expression(_)) => todo!(),
-            (RuntimeVal::Bool(_), RuntimeVal::Bool(_)) => todo!(),
+            (Number(_), Symbol(_))
+            | (Number(_), Product(_))
+            | (Number(_), Exponent(_, _))
+            | (Symbol(_), Number(_))
+            | (Symbol(_), Symbol(_))
+            | (Symbol(_), Product(_))
+            | (Symbol(_), Exponent(_, _))
+            | (Product(_), Number(_))
+            | (Product(_), Symbol(_))
+            | (Product(_), Product(_))
+            | (Product(_), Exponent(_, _))
+            | (Exponent(_, _), Number(_))
+            | (Exponent(_, _), Symbol(_))
+            | (Exponent(_, _), Product(_))
+            | (Exponent(_, _), Exponent(_, _)) => {
+                return RuntimeVal::Sum(vec![self, other]);
+            } 
         }
     }
     fn multiply(self, other: RuntimeVal) -> RuntimeVal {
+        use RuntimeVal::*;
         match (self, other) {
-            (RuntimeVal::Number(lhs), RuntimeVal::Number(rhs)) => RuntimeVal::Number(lhs * rhs),
+            (Unit, _) | (_, Unit) => panic!("Unit error when multiplicating"),
 
-            (RuntimeVal::Number(lhs), RuntimeVal::Expression(mut rhs))
-            | (RuntimeVal::Expression(mut rhs), RuntimeVal::Number(lhs)) => match &mut rhs {
-                AlgebraExpr::Product(v) => {
-                    v.push(lhs.into());
-                    return rhs.into();
-                }
+            (Bool(_), _) | (_, Bool(_)) => panic!("No multiplication with booleans"),
 
-                AlgebraExpr::Sum(_) | AlgebraExpr::Exponent(_, _) | AlgebraExpr::Symbol(_) => {
-                    AlgebraExpr::Product(vec![lhs.into(), rhs]).into()
-                }
+            (Number(lhs), Number(rhs)) => Number(lhs * rhs),
 
-                AlgebraExpr::Number(_) => todo!("Shouldn't be able to happen?"),
-            },
-            (RuntimeVal::Number(_), RuntimeVal::Bool(_)) => todo!(),
-
-            (RuntimeVal::Expression(mut lhs), RuntimeVal::Expression(mut rhs)) => {
-                match (&mut lhs, &mut rhs) {
-                    (AlgebraExpr::Product(lhs_v), AlgebraExpr::Product(rhs_v)) => {
-                        lhs_v.append(rhs_v)
-                    }
-
-                    (AlgebraExpr::Product(lhs_v), AlgebraExpr::Sum(_))
-                    | (AlgebraExpr::Product(lhs_v), AlgebraExpr::Exponent(_, _))
-                    | (AlgebraExpr::Product(lhs_v), AlgebraExpr::Number(_))
-                    | (AlgebraExpr::Product(lhs_v), AlgebraExpr::Symbol(_)) => {
-                        lhs_v.push(rhs);
-                        return lhs.into();
-                    }
-
-                    (AlgebraExpr::Sum(_), AlgebraExpr::Product(rhs_v))
-                    | (AlgebraExpr::Number(_), AlgebraExpr::Product(rhs_v))
-                    | (AlgebraExpr::Symbol(_), AlgebraExpr::Product(rhs_v))
-                    | (AlgebraExpr::Exponent(_, _), AlgebraExpr::Product(rhs_v)) => {
-                        rhs_v.push(lhs);
-                        return rhs.into();
-                    }
-
-                    _ => {
-                        return AlgebraExpr::Product(vec![lhs, rhs]).into();
-                    }
-                }
-                panic!("UH OH!!!!");
+            (Product(mut v), other) | (other, Product(mut v)) => {
+                v.push(other);
+                return RuntimeVal::Product(v);
             }
 
-            (RuntimeVal::Expression(_), RuntimeVal::Bool(_)) => todo!(),
-            (RuntimeVal::Unit, RuntimeVal::Unit) => todo!(),
-            (RuntimeVal::Unit, RuntimeVal::Number(_)) => todo!(),
-            (RuntimeVal::Unit, RuntimeVal::Expression(_)) => todo!(),
-            (RuntimeVal::Unit, RuntimeVal::Bool(_)) => todo!(),
-            (RuntimeVal::Number(_), RuntimeVal::Unit) => todo!(),
-            (RuntimeVal::Expression(_), RuntimeVal::Unit) => todo!(),
-            (RuntimeVal::Bool(_), RuntimeVal::Unit) => todo!(),
-            (RuntimeVal::Bool(_), RuntimeVal::Number(_)) => todo!(),
-            (RuntimeVal::Bool(_), RuntimeVal::Expression(_)) => todo!(),
-            (RuntimeVal::Bool(_), RuntimeVal::Bool(_)) => todo!(),
+            (Number(_), Symbol(_))
+            | (Number(_), Sum(_))
+            | (Number(_), Exponent(_, _))
+            | (Symbol(_), Number(_))
+            | (Symbol(_), Symbol(_))
+            | (Symbol(_), Sum(_))
+            | (Symbol(_), Exponent(_, _))
+            | (Sum(_), Number(_))
+            | (Sum(_), Symbol(_))
+            | (Sum(_), Sum(_))
+            | (Sum(_), Exponent(_, _))
+            | (Exponent(_, _), Number(_))
+            | (Exponent(_, _), Symbol(_))
+            | (Exponent(_, _), Sum(_))
+            | (Exponent(_, _), Exponent(_, _)) => {
+                return RuntimeVal::Product(vec![self, other]);
+            } 
         }
     }
     fn power(self, other: RuntimeVal) -> RuntimeVal {
+        use RuntimeVal::*;
         match (self, other) {
-            (RuntimeVal::Number(lhs), RuntimeVal::Number(rhs)) => RuntimeVal::Number(lhs.powf(rhs)),
+            (Unit, _) | (_, Unit) => panic!("Unit error when powering"),
 
-            (RuntimeVal::Number(lhs), RuntimeVal::Expression(rhs)) => {
-                return AlgebraExpr::Exponent(Box::new(lhs.into()), Box::new(rhs)).into();
+            (Bool(_), _) | (_, Bool(_)) => panic!("No powering with booleans"),
+
+            (Number(lhs), Number(rhs)) => Number(lhs.powf(rhs)),
+
+            (Number(_), Symbol(_))
+            | (Number(_), Sum(_))
+            | (Number(_), Product(_))
+            | (Number(_), Exponent(_, _))
+            | (Symbol(_), Number(_))
+            | (Symbol(_), Symbol(_))
+            | (Symbol(_), Sum(_))
+            | (Symbol(_), Product(_))
+            | (Symbol(_), Exponent(_, _))
+            | (Sum(_), Number(_))
+            | (Sum(_), Symbol(_))
+            | (Sum(_), Sum(_))
+            | (Sum(_), Product(_))
+            | (Sum(_), Exponent(_, _))
+            | (Product(_), Number(_))
+            | (Product(_), Symbol(_))
+            | (Product(_), Sum(_))
+            | (Product(_), Product(_))
+            | (Product(_), Exponent(_, _))
+            | (Exponent(_, _), Number(_))
+            | (Exponent(_, _), Symbol(_))
+            | (Exponent(_, _), Sum(_))
+            | (Exponent(_, _), Product(_))
+            | (Exponent(_, _), Exponent(_, _)) => {
+                return Exponent(Box::new(self), Box::new(other));
             }
 
-            (RuntimeVal::Expression(rhs), RuntimeVal::Number(lhs)) => {
-                return AlgebraExpr::Exponent(Box::new(rhs), Box::new(lhs.into())).into();
-            }
-
-            (RuntimeVal::Expression(mut lhs), RuntimeVal::Expression(mut rhs)) => {
-                match (&mut lhs, &mut rhs) {
-                    _ => {
-                        return AlgebraExpr::Exponent(Box::new(lhs), Box::new(rhs)).into();
-                    }
-                }
-            }
-
-            (RuntimeVal::Expression(_), RuntimeVal::Bool(_)) => todo!(),
-            (RuntimeVal::Unit, RuntimeVal::Unit) => todo!(),
-            (RuntimeVal::Unit, RuntimeVal::Number(_)) => todo!(),
-            (RuntimeVal::Unit, RuntimeVal::Expression(_)) => todo!(),
-            (RuntimeVal::Unit, RuntimeVal::Bool(_)) => todo!(),
-            (RuntimeVal::Number(_), RuntimeVal::Unit) => todo!(),
-            (RuntimeVal::Expression(_), RuntimeVal::Unit) => todo!(),
-            (RuntimeVal::Bool(_), RuntimeVal::Unit) => todo!(),
-            (RuntimeVal::Bool(_), RuntimeVal::Number(_)) => todo!(),
-            (RuntimeVal::Bool(_), RuntimeVal::Expression(_)) => todo!(),
-            (RuntimeVal::Bool(_), RuntimeVal::Bool(_)) => todo!(),
-            (RuntimeVal::Number(_), RuntimeVal::Bool(_)) => todo!(),
         }
     }
     fn less(self, other: RuntimeVal) -> RuntimeVal {
@@ -389,34 +339,26 @@ impl RuntimeVal {
     }
 }
 
-#[derive(Clone, Debug)]
-pub enum AlgebraExpr {
-    Sum(Vec<AlgebraExpr>),
-    Product(Vec<AlgebraExpr>),
-    Exponent(Box<AlgebraExpr>, Box<AlgebraExpr>),
-    Number(f64),
-    Symbol(String),
-}
-
-impl AlgebraExpr {
+impl RuntimeVal {
     fn simplify(&mut self) {
         /*let test = self.struct_equal(&mut AlgebraExpr::Sum(vec![
             AlgebraExpr::Product(vec![(3.0).into(), AlgebraExpr::Symbol("x".to_owned())]),
             AlgebraExpr::Product(vec![(2.0).into(), AlgebraExpr::Symbol("x".to_owned())]),
         ]));
 
-        dbg!(test);*/
+        dbg!(test);
+        */
 
-        self.add_like_terms();
+        self.combine_like_terms();
         dbg!(&self);
-        self.add_integers();
+        self.combine_integers();
         dbg!(&self);
     }
 
-    fn add_integers(&mut self) {
+    fn combine_integers(&mut self) {
         dbg!(&self);
         match self {
-            AlgebraExpr::Sum(terms) => {
+            RuntimeVal::Sum(terms) => {
                 if terms.len() == 1 {
                     *self = terms[0].clone();
                     return;
@@ -426,7 +368,7 @@ impl AlgebraExpr {
 
                 let mut i = 0;
                 while i < terms.len() {
-                    if let AlgebraExpr::Number(n) = terms[i] {
+                    if let RuntimeVal::Number(n) = terms[i] {
                         total += n;
                         terms.remove(i);
                     } else {
@@ -434,14 +376,14 @@ impl AlgebraExpr {
                     }
                 }
 
-                let constant = AlgebraExpr::Number(total);
+                let constant = RuntimeVal::Number(total);
                 if terms.is_empty() {
                     *self = constant
                 } else if total != 0.0 {
                     terms.push(constant);
                 }
             }
-            AlgebraExpr::Product(factors) => {
+            RuntimeVal::Product(factors) => {
                 if factors.len() == 1 {
                     *self = factors[0].clone();
                     return;
@@ -451,7 +393,7 @@ impl AlgebraExpr {
 
                 let mut i = 0;
                 while i < factors.len() {
-                    if let AlgebraExpr::Number(n) = factors[i] {
+                    if let RuntimeVal::Number(n) = factors[i] {
                         total *= n;
                         factors.remove(i);
                     } else {
@@ -462,15 +404,17 @@ impl AlgebraExpr {
                 dbg!(&total);
                 if total != 1.0 {
                     dbg!(&total);
-                    factors.push(AlgebraExpr::Number(total));
+                    factors.push(RuntimeVal::Number(total));
                 }
             }
-            AlgebraExpr::Exponent(_, _) => todo!(),
-            AlgebraExpr::Number(_) | AlgebraExpr::Symbol(_) => {}
+            RuntimeVal::Exponent(_, _) => todo!(),
+            RuntimeVal::Number(_) | RuntimeVal::Symbol(_) => {}
+            RuntimeVal::Unit => todo!(),
+            RuntimeVal::Bool(_) => todo!(),
         }
     }
 
-    fn add_like_terms(&mut self) {
+    fn combine_like_terms(&mut self) {
         match self {
             Self::Sum(terms) => {
                 let mut term_coefficients = Vec::new();
@@ -479,10 +423,10 @@ impl AlgebraExpr {
                 for term in terms {
                     let mut co_efficient = 1.0;
                     let mut index = 0;
-                    if let AlgebraExpr::Product(factors) = term {
+                    if let RuntimeVal::Product(factors) = term {
                         while index < factors.len() {
                             let factor = &factors[index];
-                            if let AlgebraExpr::Number(n) = factor {
+                            if let RuntimeVal::Number(n) = factor {
                                 co_efficient *= n;
                                 factors.remove(index);
                                 term.simplify();
@@ -500,7 +444,7 @@ impl AlgebraExpr {
                 dbg!(&term_coefficients);
                 // Combine like terms
                 #[allow(unused_variables, unused_mut)]
-                let mut new_terms: Vec<AlgebraExpr> = Vec::new();
+                let mut new_terms: Vec<RuntimeVal> = Vec::new();
 
                 while let Some((co_eff, mut term)) = term_coefficients.pop() {
                     let mut coefficient_total = co_eff;
@@ -519,21 +463,21 @@ impl AlgebraExpr {
                     if coefficient_total == 1.0 {
                         new_terms.push(term);
                     } else {
-                        let mut term = AlgebraExpr::Product(vec![coefficient_total.into(), term]);
+                        let mut term = RuntimeVal::Product(vec![coefficient_total.into(), term]);
                         term.simplify();
                         new_terms.push(term);
                     }
                     dbg!(&new_terms);
                 }
-                *self = AlgebraExpr::Sum(new_terms);
+                *self = RuntimeVal::Sum(new_terms);
             }
             _ => {}
         }
     }
 
-    fn struct_equal(&mut self, other: &mut AlgebraExpr) -> bool {
+    fn struct_equal(&mut self, other: &mut RuntimeVal) -> bool {
         match (self, other) {
-            (AlgebraExpr::Sum(terms), AlgebraExpr::Sum(other)) => {
+            (RuntimeVal::Sum(terms), RuntimeVal::Sum(other)) => {
                 if terms.len() != other.len() {
                     return false;
                 }
@@ -558,7 +502,7 @@ impl AlgebraExpr {
 
                 true
             }
-            (AlgebraExpr::Product(factors), AlgebraExpr::Product(other)) => {
+            (RuntimeVal::Product(factors), RuntimeVal::Product(other)) => {
                 if factors.len() != other.len() {
                     return false;
                 }
@@ -583,28 +527,22 @@ impl AlgebraExpr {
 
                 true
             }
-            (AlgebraExpr::Exponent(_, _), AlgebraExpr::Exponent(_, _)) => todo!(),
-            (AlgebraExpr::Number(num), AlgebraExpr::Number(other)) => num == other,
-            (AlgebraExpr::Symbol(symbol), AlgebraExpr::Symbol(other)) => symbol == other,
+            (RuntimeVal::Exponent(_, _), RuntimeVal::Exponent(_, _)) => todo!(),
+            (RuntimeVal::Number(num), RuntimeVal::Number(other)) => num == other,
+            (RuntimeVal::Symbol(symbol), RuntimeVal::Symbol(other)) => symbol == other,
             _ => false,
         }
     }
 }
 
-impl Into<AlgebraExpr> for String {
-    fn into(self) -> AlgebraExpr {
-        AlgebraExpr::Symbol(self)
-    }
-}
-
-impl Into<AlgebraExpr> for f64 {
-    fn into(self) -> AlgebraExpr {
-        AlgebraExpr::Number(self)
-    }
-}
-
-impl Into<RuntimeVal> for AlgebraExpr {
+impl Into<RuntimeVal> for String {
     fn into(self) -> RuntimeVal {
-        RuntimeVal::Expression(self)
+        RuntimeVal::Symbol(self)
+    }
+}
+
+impl Into<RuntimeVal> for f64 {
+    fn into(self) -> RuntimeVal {
+        RuntimeVal::Number(self)
     }
 }
