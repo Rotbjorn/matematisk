@@ -1,6 +1,7 @@
 use std::{fs::File, io::Write, str::FromStr};
 
-use matex_common::node::{ASTGraphGenerator, Statement, Visitor};
+use matex_common::node::{ASTGraphGenerator, Statement};
+
 use matex_compiler::cas::{
     backend::{runtime::Runtime, format::{NormalFormatter, ValueFormatter}},
     frontend::{lexer, parser},
@@ -37,7 +38,6 @@ impl REPL {
 
             let mut parser = parser::Parser::new(lexer::Lexer::new(&input).collect());
             let result = parser.parse();
-            dbg!(parser.parsed);
             match result {
                 Ok(ast) => {
                     let exit_value = self.runtime.run(&ast);

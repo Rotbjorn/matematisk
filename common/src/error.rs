@@ -1,7 +1,7 @@
 use std::fmt::Display;
 
 // TODO: Contain positon where error occured?
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum ParseError {
     WrongToken { message: String },
     EndOfStream,

@@ -1,3 +1,5 @@
+use matex_common::node::Precedence;
+
 use super::runtime::RuntimeVal;
 
 pub trait ValueFormatter {
@@ -6,8 +8,8 @@ pub trait ValueFormatter {
 
 pub struct NormalFormatter;
 
-impl ValueFormatter for NormalFormatter {
-    fn format(value: &RuntimeVal) -> String {
+impl NormalFormatter {
+    fn format_impl(value: &RuntimeVal, prec: Precedence) -> String {
         use RuntimeVal::*;
         match value {
             Unit => "Unit value".to_owned(),
@@ -19,12 +21,22 @@ impl ValueFormatter for NormalFormatter {
                 for term in terms {
                     vec.push(Self::format(term));
                 }
+
+                let string = vec.join("+");
+
+                if prec > Precedence::Term {
+                    return format!("({})", string); 
+                }
+
                 return vec.join("+");
             }
             Product(factors) => {
+                if factors.len() == 2 {
+
+                }
                 let mut vec = Vec::new();
                 for factor in factors {
-                    vec.push(Self::format(factor));
+                    vec.push(Self::format_impl(factor, Precedence::Factor));
                 }
                 return vec.join("*");
             }
@@ -34,5 +46,11 @@ impl ValueFormatter for NormalFormatter {
                 return base_str + "^" + exp_str.as_str();
             }
         }
+    }
+}
+
+impl ValueFormatter for NormalFormatter {
+    fn format(value: &RuntimeVal) -> String {
+        NormalFormatter::format_impl(value, Precedence::None)
     }
 }

@@ -77,7 +77,11 @@ impl Parser {
     }
     fn parse_statement(&mut self) -> ParseResult<Statement> {
         match self.get_token()? {
-            _ => Ok(Statement::Expression(self.parse_expression()?)),
+            _ => {
+                let expression = Statement::Expression(self.parse_expression()?);
+                self.consume_newline_or_eof("Expected newline after expression statement.")?;
+                Ok(expression)
+            }
         }
     }
 
@@ -460,6 +464,17 @@ impl Parser {
                 self.consume()?;
             } else {
                 break;
+            }
+        }
+        Ok(())
+    }
+
+    fn consume_newline_or_eof(&mut self, message: &str) -> ParseResult<()> {
+        if let Err(e) = self.expect(TokenType::NewLine, message) {
+            return if e == ParseError::EndOfStream {
+                Ok(())
+            } else {
+                Err(e)
             }
         }
         Ok(())

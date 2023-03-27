@@ -1,7 +1,7 @@
 use eframe::App;
 use egui::{TextEdit, Ui};
 use matex_compiler::cas::{
-    backend::runtime::Runtime,
+    backend::{runtime::Runtime, format::{ValueFormatter, NormalFormatter}},
     frontend::{lexer::Lexer, parser::Parser},
 };
 
@@ -47,7 +47,7 @@ impl App for MatexApp {
                 if let Ok(program) = Parser::new(Lexer::new(&self.source).collect()).parse() {
                     let last_value = self.runtime.run(&program);
                     self.executed
-                        .push((self.source.clone(), format!("{:?}", last_value)));
+                        .push((self.source.clone(), format!("{}", NormalFormatter::format(&last_value))));
                     self.source.clear();
                 }
             }
@@ -65,6 +65,18 @@ impl App for MatexApp {
                 plot_ui.line(line)
             });
             */
+        });
+        
+        egui::Window::new("Environment").show(ctx, |ui| {
+            ui.label("Functions:");
+            for (key, value) in &self.runtime.functions {
+                ui.label(format!("{}: {:?}", key, value));
+            }
+            ui.separator();
+            ui.label("Variables:");
+            for (key, value) in &self.runtime.variables {
+                ui.label(format!("{}: {}", key, NormalFormatter::format(value)));
+            }
         });
     }
 }

@@ -52,11 +52,10 @@ fn main() {
 
         let result = parser.parse();
 
-        dbg!(&parser.parsed);
-
         let Ok(ast) = result else {
             let error = result.err().unwrap();
-            panic!("{:?}", error);
+            eprintln!("{}", error);
+            exit(-1);
         };
 
         println!("Node: --------\n{:?}\n--------", ast);

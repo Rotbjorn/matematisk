@@ -1,3 +1,4 @@
+use std::collections::VecDeque;
 use std::{collections::HashMap, ops::Deref};
 
 use matex_common::node::{BinOp, Expr, Statement};
@@ -8,8 +9,8 @@ use super::format::ValueFormatter;
 
 #[derive(Default)]
 pub struct Runtime {
-    functions: HashMap<String, Expr>,
-    variables: HashMap<String, RuntimeVal>,
+    pub functions: HashMap<String, Expr>,
+    pub variables: HashMap<String, RuntimeVal>,
 }
 
 impl Runtime {
@@ -162,7 +163,6 @@ impl Visitor<RuntimeVal> for Runtime {
                 let mut expr = self.visit_expr(expr);
 
                 expr.simplify();
-                dbg!(&expr);
 
                 return expr;
             }
@@ -193,8 +193,8 @@ pub enum RuntimeVal {
 
     Bool(bool),
 
-    Sum(Vec<RuntimeVal>),
-    Product(Vec<RuntimeVal>),
+    Sum(VecDeque<RuntimeVal>),
+    Product(VecDeque<RuntimeVal>),
     Exponent(Box<RuntimeVal>, Box<RuntimeVal>),
 }
 
@@ -213,12 +213,12 @@ impl RuntimeVal {
             (Number(lhs), Number(rhs)) => Number(lhs.deref() + rhs.deref()),
 
             (Sum(v), _) => {
-                v.push(other);
+                v.push_back(other);
                 return self;
             }
 
             (_, Sum(v)) => {
-                v.push(self);
+                v.push_back(self);
                 return other;
             }
 
@@ -237,7 +237,7 @@ impl RuntimeVal {
             | (Exponent(_, _), Symbol(_))
             | (Exponent(_, _), Product(_))
             | (Exponent(_, _), Exponent(_, _)) => {
-                return RuntimeVal::Sum(vec![self, other]);
+                return RuntimeVal::Sum(VecDeque::from([self, other]));
             }
         }
     }
@@ -251,12 +251,12 @@ impl RuntimeVal {
             (Number(lhs), Number(rhs)) => Number(lhs.deref() * rhs.deref()),
 
             (Product(v), _) => {
-                v.push(other);
+                v.push_back(other);
                 return self;
             }
 
             (_, Product(v)) => {
-                v.push(self);
+                v.push_back(self);
                 return other;
             }
 
@@ -275,7 +275,7 @@ impl RuntimeVal {
             | (Exponent(_, _), Symbol(_))
             | (Exponent(_, _), Sum(_))
             | (Exponent(_, _), Exponent(_, _)) => {
-                return RuntimeVal::Product(vec![self, other]);
+                return RuntimeVal::Product(VecDeque::from([self, other]));
             }
         }
     }
@@ -371,9 +371,9 @@ impl RuntimeVal {
     }
 
     fn combine_integers(&mut self) {
-        dbg!(&self);
+        use RuntimeVal::*;
         match self {
-            RuntimeVal::Sum(terms) => {
+            Sum(terms) => {
                 if terms.len() == 1 {
                     *self = terms[0].clone();
                     return;
@@ -395,17 +395,18 @@ impl RuntimeVal {
                 if terms.is_empty() {
                     *self = constant
                 } else if total != 0.0 {
-                    terms.push(constant);
+                    terms.push_back(constant);
                 }
             }
+            /*
             RuntimeVal::Product(factors) => {
                 if factors.len() == 1 {
                     *self = factors[0].clone();
                     return;
                 }
-
+                
                 let mut total = 1.0;
-
+                
                 let mut i = 0;
                 while i < factors.len() {
                     if let RuntimeVal::Number(n) = factors[i] {
@@ -415,17 +416,22 @@ impl RuntimeVal {
                         i += 1;
                     }
                 }
-
-                dbg!(&total);
+                
                 if total != 1.0 {
-                    dbg!(&total);
-                    factors.push(RuntimeVal::Number(total));
+                    factors.push_front(RuntimeVal::Number(total));
                 }
             }
-            RuntimeVal::Exponent(_, _) => todo!(),
-            RuntimeVal::Number(_) | RuntimeVal::Symbol(_) => {}
-            RuntimeVal::Unit => todo!(),
-            RuntimeVal::Bool(_) => todo!(),
+            */
+            Product(factors) => {
+                if factors.len() == 1 {
+                    *self = factors[0].clone();
+                    return;
+                }
+            }
+            Exponent(_, _) => todo!(),
+            Number(_) | RuntimeVal::Symbol(_) => {}
+            Unit => todo!(),
+            Bool(_) => todo!(),
         }
     }
 
@@ -437,29 +443,28 @@ impl RuntimeVal {
                 // Extract the coefficients from each term
                 for term in terms {
                     let mut co_efficient = 1.0;
+
                     let mut index = 0;
                     if let RuntimeVal::Product(factors) = term {
                         while index < factors.len() {
-                            let factor = &factors[index];
+                            let factor = &mut factors[index];
+                            dbg!(&factor);
                             if let RuntimeVal::Number(n) = factor {
-                                co_efficient *= n;
+                                co_efficient *= *n;
+                                dbg!(&co_efficient);
                                 factors.remove(index);
-                                term.simplify();
-                                break;
                             }
                             index += 1;
                         }
                     }
-
-                    let test = (co_efficient, term.clone());
-                    dbg!(&test);
-                    term_coefficients.push(test);
+                    term.simplify();
+                    term_coefficients.push((co_efficient, term.clone()));
+                    dbg!(&term_coefficients);
                 }
 
-                dbg!(&term_coefficients);
                 // Combine like terms
                 #[allow(unused_variables, unused_mut)]
-                let mut new_terms: Vec<RuntimeVal> = Vec::new();
+                let mut new_terms = VecDeque::new();
 
                 while let Some((co_eff, mut term)) = term_coefficients.pop() {
                     let mut coefficient_total = co_eff;
@@ -476,13 +481,12 @@ impl RuntimeVal {
                     }
 
                     if coefficient_total == 1.0 {
-                        new_terms.push(term);
+                        new_terms.push_back(term);
                     } else {
-                        let mut term = RuntimeVal::Product(vec![coefficient_total.into(), term]);
+                        let mut term = RuntimeVal::Product(VecDeque::from([coefficient_total.into(), term]));
                         term.simplify();
-                        new_terms.push(term);
+                        new_terms.push_back(term);
                     }
-                    dbg!(&new_terms);
                 }
                 *self = RuntimeVal::Sum(new_terms);
             }
