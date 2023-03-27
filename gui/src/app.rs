@@ -42,9 +42,8 @@ impl App for MatexApp {
             visuals.panel_fill = Color32::DARK_RED;
             ctx.set_visuals(visuals);
             */
-            ui.text_edit_multiline(&mut self.source);
-
-            let input = TextEdit::multiline(&mut self.source).
+            TextEdit::multiline(&mut self.source)
+                .show(ui);
 
             if ui.button("Run").clicked() {
                 if let Ok(program) = Parser::new(Lexer::new(&self.source).collect()).parse() {
