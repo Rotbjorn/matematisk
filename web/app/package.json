@@ -3,9 +3,9 @@
 	"version": "0.0.1",
 	"private": true,
 	"scripts": {
-		"cleanbuild": "wasm-pack build ../ && npm run build && npm run preview",
 		"dev": "vite dev",
 		"build": "vite build",
+		"build:clean": "rm -r build && wasm-pack build ../ && npm run build",
 		"preview": "vite preview",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch"

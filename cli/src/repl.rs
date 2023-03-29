@@ -3,7 +3,10 @@ use std::{fs::File, io::Write, str::FromStr};
 use matex_common::node::{ASTGraphGenerator, Statement};
 
 use matex_compiler::cas::{
-    backend::{runtime::Runtime, format::{NormalFormatter, ValueFormatter}},
+    backend::{
+        format::{NormalFormatter, ValueFormatter},
+        runtime::Runtime,
+    },
     frontend::{lexer, parser},
 };
 use rustyline::error::ReadlineError;
@@ -42,8 +45,10 @@ impl REPL {
                 Ok(ast) => {
                     let exit_value = self.runtime.run(&ast);
 
+                    dbg!(&exit_value);
                     let formatted_value = NormalFormatter::format(&exit_value);
 
+                    println!("u> {:?}", exit_value);
                     println!("o> {}", formatted_value);
                 }
                 Err(e) => {

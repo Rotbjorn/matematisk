@@ -1,5 +1,7 @@
 use matex_common::node::Precedence;
 
+use crate::cas::backend::runtime::{Factors, Terms};
+
 use super::runtime::RuntimeVal;
 
 pub trait ValueFormatter {
@@ -13,37 +15,74 @@ impl NormalFormatter {
         use RuntimeVal::*;
         match value {
             Unit => "Unit value".to_owned(),
-            Number(n) => n.to_string(),
-            Symbol(s) => s.to_string(),
-            Bool(b) => b.to_string(),
-            Sum(terms) => {
-                let mut vec = Vec::new();
-                for term in terms {
-                    vec.push(Self::format(term));
+            Number(n) if prec == Precedence::Term => {
+                if n.is_sign_negative() {
+                    format!(" - {}", -n)
+                } else {
+                    format!(" + {}", n)
                 }
-
-                let string = vec.join("+");
+            }
+            Number(n) => n.to_string(),
+            Symbol(s) => {
+                if prec == Precedence::Term {
+                    format!(" + {}", s)
+                } else {
+                    s.clone()
+                }
+            }
+            Bool(b) => format!(" + {}", b.to_string()),
+            Sum(Terms(terms)) => {
+                let mut buffer = String::new();
+                for (i, term) in terms.iter().enumerate() {
+                    if i == 0 {
+                        buffer.push_str(&Self::format(term));
+                    } else {
+                        buffer.push_str(&Self::format_impl(term, Precedence::Term));
+                    }
+                }
 
                 if prec > Precedence::Term {
-                    return format!("({})", string); 
+                    return format!("({})", buffer);
                 }
 
-                return vec.join("+");
+                return buffer;
             }
-            Product(factors) => {
-                if factors.len() == 2 {
-
-                }
+            Product(Factors(factors)) => {
                 let mut vec = Vec::new();
+
+                let mut negative_term = false;
+
                 for factor in factors {
+                    if let Number(n) = factor {
+                        if n.is_sign_negative() {
+                            negative_term = !negative_term;
+                            if *n == -1.0 {
+                                continue;
+                            }
+                            vec.push(Self::format_impl(&Number(-n), Precedence::Factor));
+                            continue;
+                        }
+                    }
                     vec.push(Self::format_impl(factor, Precedence::Factor));
                 }
-                return vec.join("*");
+                let mul_string = vec.join(" * ");
+
+                if prec == Precedence::Term {
+                    return format!(" {} {}", if negative_term { "-" } else { "+" }, mul_string);
+                } else {
+                    return format!("{}{}", if negative_term { "-" } else { "" }, mul_string);
+                }
             }
             Exponent(base, exp) => {
                 let base_str = Self::format(base);
                 let exp_str = Self::format(exp);
-                return base_str + "^" + exp_str.as_str();
+
+                let str = base_str + "^" + exp_str.as_str();
+                return if prec == Precedence::Term {
+                    format!(" + {}", str)
+                } else {
+                    str
+                };
             }
         }
     }
