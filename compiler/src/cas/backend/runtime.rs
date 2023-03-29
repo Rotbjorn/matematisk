@@ -1,3 +1,4 @@
+use std::cmp::Ordering;
 use std::collections::VecDeque;
 use std::{collections::HashMap, ops::Deref};
 
@@ -368,6 +369,8 @@ impl RuntimeVal {
                 dbg!(&terms);
                 RuntimeVal::combine_integers(terms);
                 dbg!(&terms);
+                RuntimeVal::rearrange(terms);
+                dbg!(&terms);
             }
             Product(factors) => {
                 let coeff = RuntimeVal::extract_coefficient(factors);
@@ -408,6 +411,7 @@ impl RuntimeVal {
                 }
             }
 
+
             if coefficient_total == 1.0 {
                 new_terms.push_front(term);
             } else if coefficient_total == 0.0 {
@@ -440,11 +444,34 @@ impl RuntimeVal {
             }
         }
 
+        if total == 0.0 {
+            return;
+        }
+
         let constant = RuntimeVal::Number(total);
 
-        if total != 0.0 {
-            terms.push_back(constant);
-        }
+        terms.push_back(constant);
+    }
+
+    fn rearrange(Terms(terms): &mut Terms) {
+        use RuntimeVal::*;
+        let terms = terms.make_contiguous();
+        terms.sort_by(|a, b| {
+            dbg!(&a);
+            dbg!(&b);
+            return match (a, b) {
+                (_, Product(factors)) => {
+                    return if RuntimeVal::product_is_negative(&factors) {
+                        Ordering::Less
+                    } else {
+                        Ordering::Greater
+                    }
+                }
+                (Product(factors), _) if RuntimeVal::product_is_negative(&factors) => Ordering::Greater,
+                (_, _) => Ordering::Less
+            };
+        });
+        dbg!(&terms);
     }
 
     fn flatten(&mut self) {
@@ -558,6 +585,19 @@ impl RuntimeVal {
         }
         dbg!(&coeff);
         coeff
+    }
+
+    fn product_is_negative(Factors(factors): &Factors) -> bool {
+        use RuntimeVal::*;
+
+        factors.iter().fold(false, |is_negative, factor| {
+            if let Number(n) = factor {
+                if n.is_sign_negative() {
+                    return !is_negative
+                }
+            }
+            is_negative
+        })
     }
 }
 
