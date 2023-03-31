@@ -1,13 +1,17 @@
 use std::fmt::{Error, Write};
 
-use crate::token::TokenType;
+use crate::{function::Parameter, token::TokenType};
 
 type Statements = Vec<Statement>;
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub enum Statement {
     Program(Statements),
-    Function { name: String, body: Expr },
+    Function {
+        name: String,
+        parameters: Vec<Parameter>,
+        body: Expr,
+    },
     Expression(Expr),
 }
 
@@ -82,8 +86,8 @@ impl BinOp {
     }
 }
 
-impl From<TokenType> for BinOp {
-    fn from(value: TokenType) -> Self {
+impl From<&TokenType> for BinOp {
+    fn from(value: &TokenType) -> Self {
         match value {
             TokenType::Plus => BinOp::Add,
             TokenType::Minus => BinOp::Subtract,
@@ -172,7 +176,11 @@ impl<'a, W: Write> Visitor<Result<u32, Error>> for ASTGraphGenerator<'a, W> {
                 }
             }
 
-            Statement::Function { name, body } => {
+            Statement::Function {
+                name,
+                parameters: _,
+                body,
+            } => {
                 self.create_node(&format!("func: {}", name))?;
 
                 let body = self.visit_expr(body)?;
