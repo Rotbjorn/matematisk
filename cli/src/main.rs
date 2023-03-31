@@ -31,6 +31,7 @@ enum Commands {
 }
 
 fn main() {
+    env_logger::builder().format_timestamp(None).init();
     let args = Args::parse();
     if let Some(path) = args.path {
         let read_file = fs::read_to_string(&path);
@@ -74,13 +75,13 @@ fn main() {
                 .expect("Couldn't write to dot file!");
         }
 
-        let mut runtime = Runtime::default();
+        let mut runtime = Runtime::new();
 
         let exit_value = runtime.visit_statement(&ast);
 
         println!("EXIT VALUE: {:?}", exit_value);
     } else {
-        let mut repl = REPL::default();
+        let mut repl = REPL::new();
         let _ = repl.run();
     }
 }

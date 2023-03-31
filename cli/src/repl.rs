@@ -11,12 +11,16 @@ use matex_compiler::cas::{
 };
 use rustyline::error::ReadlineError;
 
-#[derive(Default)]
 pub struct REPL {
     runtime: Runtime,
 }
 
 impl REPL {
+    pub fn new() -> Self {
+        Self {
+            runtime: Runtime::new(),
+        }
+    }
     pub fn run(&mut self) -> Result<(), ReadlineError> {
         let mut rl = rustyline::DefaultEditor::new()?;
 
@@ -43,6 +47,13 @@ impl REPL {
             let result = parser.parse();
             match result {
                 Ok(ast) => {
+                    self.runtime
+                        .environment
+                        .get_scope()
+                        .borrow_mut()
+                        .functions
+                        .extend(parser.parsed.functions);
+
                     let exit_value = self.runtime.run(&ast);
 
                     dbg!(&exit_value);
