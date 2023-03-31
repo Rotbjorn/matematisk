@@ -62,7 +62,7 @@ impl PartialEq for TokenType {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub enum KeywordType {
     If,
     Else,
