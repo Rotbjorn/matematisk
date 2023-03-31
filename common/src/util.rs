@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use std::{collections::HashMap, fmt::Display};
 
 #[derive(Debug, Clone, Copy)]
 pub struct Position {
@@ -11,3 +11,5 @@ impl Display for Position {
         f.write_fmt(format_args!("(row {}, col {})", self.row, self.col))
     }
 }
+
+pub type SymbolTable<T> = HashMap<String, T>;
