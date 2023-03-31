@@ -1,33 +1,31 @@
 use core::panic;
-use std::collections::HashMap;
 
+use log::{debug, error};
 use matex_common::{
     error::ParseError,
+    function::{Function, Parameter},
     node::{BinOp, Expr, Precedence, Statement},
     token::{KeywordType, Token, TokenType},
+    util::SymbolTable,
 };
+
+macro_rules! parser_debug {
+    ($($arg:tt)+) => (debug!(target: "matex::parser", $($arg)+));
+}
+
+macro_rules! parser_error {
+    ($($arg:tt)+) => (error!(target: "matex::parser", $($arg)+));
+}
 
 type ParseResult<T> = std::result::Result<T, ParseError>;
 
 #[derive(Default, Debug)]
-pub struct ParsedContext {
-    functions: HashMap<String, ParsedFunction>,
+pub struct Context {
+    pub functions: SymbolTable<Function>,
 }
 
 #[derive(Debug)]
 #[allow(dead_code)]
-pub struct ParsedFunction {
-    name: String,
-    params: Vec<ParsedParameter>,
-    body: Expr,
-}
-
-#[derive(Debug)]
-#[allow(dead_code)]
-pub struct ParsedParameter {
-    name: String,
-    type_name: String,
-}
 
 pub struct Parser {
     tokens: Vec<Token>,
@@ -35,7 +33,7 @@ pub struct Parser {
     cur_token: Option<Token>,
     idx: usize,
 
-    pub parsed: ParsedContext,
+    pub parsed: Context,
 }
 
 impl Parser {
@@ -45,11 +43,12 @@ impl Parser {
             tokens,
             cur_token,
             idx: 0,
-            parsed: ParsedContext::default(),
+            parsed: Context::default(),
         }
     }
 
     pub fn parse(&mut self) -> ParseResult<Statement> {
+        use ParseError::*;
         let mut nodes: Vec<Statement> = Vec::new();
 
         loop {
@@ -57,8 +56,14 @@ impl Parser {
             match result {
                 Ok(node) => nodes.push(node),
                 Err(err) => match &err {
-                    ParseError::EndOfStream => break,
-                    ParseError::WrongToken { message: _ } => return Err(err),
+                    EndOfStream => break,
+                    _ => {
+                        parser_error!("Failed parsing");
+                        parser_error!("----------ERROR----------");
+                        parser_error!("{}", err);
+                        parser_error!("-------------------------");
+                        return Err(err);
+                    }
                 },
             }
         }
@@ -76,6 +81,7 @@ impl Parser {
         }
     }
     fn parse_statement(&mut self) -> ParseResult<Statement> {
+        parser_debug!("Parsing statement");
         match self.get_token()? {
             _ => {
                 let expression = Statement::Expression(self.parse_expression()?);
@@ -132,9 +138,9 @@ impl Parser {
         // TODO: A lot of clones...
         self.parsed.functions.insert(
             func_name.clone(),
-            ParsedFunction {
+            Function {
                 name: func_name.clone(),
-                params: vec![ParsedParameter {
+                params: vec![Parameter {
                     name: param_name,
                     type_name,
                 }],
@@ -144,11 +150,13 @@ impl Parser {
 
         Ok(Statement::Function {
             name: func_name,
+            parameters: Vec::default(), // FIXME: Add parameter name and types to HashMap...+
             body: function_body,
         })
     }
 
     fn parse_parameter_definition(&mut self) -> ParseResult<(String, String)> {
+        parser_debug!("Parsing parameter definition");
         let (_, param_name) = self.expect_identifier("Expected parameter name")?;
 
         // TODO: Do not use expect? => Instead check if type annotation is present to start with.
@@ -160,39 +168,42 @@ impl Parser {
     }
 
     fn parse_expression(&mut self) -> ParseResult<Expr> {
+        parser_debug!("Parsing expression");
         self.parse_precedence(Precedence::None)
     }
 
     fn parse_precedence(&mut self, prec: Precedence) -> ParseResult<Expr> {
+        use TokenType::*;
+
+        parser_debug!("Parsing expression with precedence: {:?}", prec);
+
         let token = self.get_token()?;
         let mut node = match token.typ {
-            TokenType::Number(_) => self.parse_number()?,
-            TokenType::Identifier(_) => self.parse_identifier()?,
-            TokenType::Keyword(kw) => self.parse_keyword(kw)?,
-            TokenType::Minus => self.parse_unary_minus()?,
-            TokenType::LeftParenthesis => self.parse_grouping()?,
-            TokenType::LeftSquareBracket => todo!("Implement lists"),
-            TokenType::RightSquareBracket => todo!("Implement lists"),
-            TokenType::RightBrace => todo!("Implement blocks"),
-            TokenType::LeftBrace => todo!("Implement blocks"),
+            Number(_) => self.parse_number()?,
+            Identifier(_) => self.parse_identifier()?,
+            Keyword(kw) => self.parse_keyword(kw)?,
+            Minus => self.parse_unary_minus()?,
+            LeftParenthesis => self.parse_grouping()?,
+            LeftSquareBracket => todo!("Implement lists"),
+            RightSquareBracket => todo!("Implement lists"),
+            RightBrace => todo!("Implement blocks"),
+            LeftBrace => todo!("Implement blocks"),
             _ => {
                 panic!("\nFailed prefix on: \n{:?}", token);
             }
         };
 
-        while !self.at_end() && prec <= BinOp::from(self.get_token()?.typ).precedence() {
+        while !self.at_end() && prec <= BinOp::from(&self.get_token()?.typ).precedence() {
             node = match self.get_token()?.typ {
-                TokenType::Plus => self.parse_addition(node)?,
-                TokenType::Minus => self.parse_subtraction(node)?,
-                TokenType::Star => self.parse_multiplication(node)?,
-                TokenType::Slash => self.parse_division(node)?,
-                TokenType::Caret => self.parse_power(node)?,
-                TokenType::Less
-                | TokenType::LessEqual
-                | TokenType::Greater
-                | TokenType::GreaterEqual => self.parse_comparison(node)?,
-                TokenType::Equal => self.parse_assignment(node)?,
+                Plus => self.parse_addition(node)?,
+                Minus => self.parse_subtraction(node)?,
+                Star => self.parse_multiplication(node)?,
+                Slash => self.parse_division(node)?,
+                Caret => self.parse_power(node)?,
+                Less | LessEqual | Greater | GreaterEqual => self.parse_comparison(node)?,
+                Equal => self.parse_assignment(node)?,
                 _ => {
+                    // TODO: Support custom infix operators?
                     break;
                 }
             };
@@ -202,25 +213,36 @@ impl Parser {
     }
 
     fn parse_number(&mut self) -> ParseResult<Expr> {
+        parser_debug!("Parsing number");
         let TokenType::Number(n) = self.consume()?.typ else {
             panic!("Expected a number.");
         };
 
-        Ok(Expr::Number(n))
+        let number = Expr::Number(n);
+
+        parser_debug!("Returning {:?}", number);
+
+        Ok(number)
     }
 
     fn parse_identifier(&mut self) -> ParseResult<Expr> {
+        parser_debug!("Parsing identifier");
         let (_, id) = self.expect_identifier("Expected identifier.")?;
 
         if self.token_matches(TokenType::LeftParenthesis) {
             // Assume function call
             return self.parse_function_call(id);
         }
-        Ok(Expr::Variable(id))
+
+        let variable = Expr::Variable(id);
+
+        parser_debug!("Variable {:?}", variable);
+
+        Ok(variable)
     }
 
     fn parse_keyword(&mut self, kw: KeywordType) -> ParseResult<Expr> {
-        // Expect Keyword type ideally....
+        parser_debug!("Parsing keyword {:?}", kw);
 
         let expr = match kw {
             KeywordType::If => self.parse_if()?,
@@ -233,43 +255,50 @@ impl Parser {
         Ok(expr)
     }
     fn parse_simplify(&mut self) -> ParseResult<Expr> {
+        parser_debug!("Parsing simplify");
         self.expect_keyword(KeywordType::Simplify, "Expected simplify keyword")?;
 
         let expr = self.parse_expression()?;
 
-        Ok(Expr::Simplify(Box::new(expr)))
+        let simplify = Expr::Simplify(Box::new(expr));
+        parser_debug!("Simplify {:?}", simplify);
+        Ok(simplify)
     }
 
     fn parse_if(&mut self) -> ParseResult<Expr> {
+        parser_debug!("Parsing if expression");
         self.expect_keyword(KeywordType::If, "Expected if")?;
 
         let condition = Box::new(self.parse_expression()?);
-        dbg!(&condition);
 
         self.expect_keyword(KeywordType::Then, "Expected then after if condition.")?;
 
         let body = Box::new(self.parse_expression()?);
-        dbg!(&body);
 
         self.expect_keyword(KeywordType::Else, "Expected else after if body.")?;
 
         let else_body = Box::new(self.parse_expression()?);
 
-        Ok(Expr::If {
+        let if_expr = Expr::If {
             condition,
             body,
             else_body,
-        })
+        };
+
+        parser_debug!("Returning {:?}", if_expr);
+
+        Ok(if_expr)
     }
 
     fn parse_function_call(&mut self, id: String) -> ParseResult<Expr> {
+        parser_debug!("Parsing function call");
         self.expect(
             TokenType::LeftParenthesis,
             "Expected parenthesis after function name",
         )?;
 
         if self.get_token()?.typ == TokenType::RightParenthesis {
-            // No arguments passed,
+            parser_debug!("No arguments passed");
             return Ok(Expr::FunctionCall {
                 name: id,
                 args: vec![],
@@ -290,7 +319,9 @@ impl Parser {
             "Expected parenthesis after arguments of function call",
         )?;
 
-        Ok(Expr::FunctionCall { name: id, args })
+        let function_call = Expr::FunctionCall { name: id, args };
+        parser_debug!("Returning {:?}", function_call);
+        Ok(function_call)
     }
 
     fn parse_grouping(&mut self) -> ParseResult<Expr> {
@@ -302,6 +333,7 @@ impl Parser {
     }
 
     fn parse_addition(&mut self, left: Expr) -> ParseResult<Expr> {
+        parser_debug!("Parsing addition");
         self.expect(TokenType::Plus, "Expected addition operator")?;
         let right = self.parse_precedence(Precedence::Factor)?;
         let node = Expr::BinaryOp {
@@ -309,10 +341,13 @@ impl Parser {
             operation: BinOp::Add,
             right: right.into(),
         };
+
+        parser_debug!("Returning addition {:?}", node);
         Ok(node)
     }
 
     fn parse_subtraction(&mut self, left: Expr) -> ParseResult<Expr> {
+        parser_debug!("Parsing subtraction");
         self.expect(TokenType::Minus, "Expected subtraction operator")?;
         let right = self.parse_precedence(Precedence::Factor)?;
 
@@ -321,10 +356,13 @@ impl Parser {
             operation: BinOp::Subtract,
             right: Box::new(right),
         };
+
+        parser_debug!("Returning subtraction {:?}", node);
         Ok(node)
     }
 
     fn parse_multiplication(&mut self, left: Expr) -> ParseResult<Expr> {
+        parser_debug!("Parsing multiplication");
         self.expect(TokenType::Star, "Expected multiplication operator")?;
         let right = self.parse_precedence(Precedence::Exponent)?;
         let node = Expr::BinaryOp {
@@ -332,10 +370,13 @@ impl Parser {
             operation: BinOp::Multiply,
             right: right.into(),
         };
+
+        parser_debug!("Returning multiplication {:?}", node);
         Ok(node)
     }
 
     fn parse_division(&mut self, left: Expr) -> ParseResult<Expr> {
+        parser_debug!("Parsing division");
         self.consume()?;
         let right = self.parse_precedence(Precedence::Exponent)?;
 
@@ -344,29 +385,39 @@ impl Parser {
             operation: BinOp::Divide,
             right: Box::new(right),
         };
+
+        parser_debug!("Returning division {:?}", node);
         Ok(node)
     }
 
     fn parse_power(&mut self, left: Expr) -> ParseResult<Expr> {
+        parser_debug!("Parsing power");
         // TODO: Something higher than Exponent?
         self.expect(TokenType::Caret, "Expected power operator")?;
         let right = self.parse_precedence(Precedence::Exponent)?;
+
         let node = Expr::BinaryOp {
             left: Box::new(left),
             operation: BinOp::Power,
             right: Box::new(right),
         };
+
+        parser_debug!("Returning power {:?}", node);
         Ok(node)
     }
 
     fn parse_comparison(&mut self, left: Expr) -> ParseResult<Expr> {
-        let operation = BinOp::from(self.get_token()?.typ);
+        parser_debug!("Parsing comparison");
+        let token = self.get_token()?;
+        let operation = BinOp::from(&token.typ);
+
         self.consume()?;
 
         // Support custom infix operators?
         if operation == BinOp::None {
-            return Err(ParseError::WrongToken {
-                message: "Expected a binary operation...".to_string(),
+            return Err(ParseError::NotComparison {
+                message: "Expected a comparison operator".to_owned(),
+                actual: token,
             });
         }
 
@@ -380,6 +431,7 @@ impl Parser {
     }
 
     fn parse_assignment(&mut self, holder: Expr) -> ParseResult<Expr> {
+        parser_debug!("Parsing assignment");
         self.expect(
             TokenType::Equal,
             "Expected assignment operator after variable name.",
@@ -394,24 +446,31 @@ impl Parser {
     }
 
     fn parse_unary_minus(&mut self) -> ParseResult<Expr> {
+        parser_debug!("Parsing unary minus");
         self.expect(TokenType::Minus, "Expected unary minus before expression")?;
 
         let expr = self.parse_precedence(Precedence::Unary)?;
 
-        Ok(Expr::Unary(Box::new(expr)))
+        let unary = Expr::Unary(Box::new(expr));
+
+        debug!("Returning {:?}", unary);
+
+        Ok(unary)
     }
 }
 
 impl Parser {
     fn expect(&mut self, expected_type: TokenType, message: &str) -> ParseResult<Token> {
-        let actual_typ = self.get_token()?.typ;
-        if actual_typ != expected_type {
-            // TODO: Change to ParseError
+        parser_debug!("Expecting {:?}", expected_type);
+
+        let token = self.get_token()?;
+
+        if token.typ != expected_type {
+            parser_debug!("Failed expect");
             Err(ParseError::WrongToken {
-                message: format!(
-                    "{}\nExpected: {:?}\nReceived: {:?}",
-                    message, expected_type, actual_typ
-                ),
+                message: message.to_owned(),
+                expected: expected_type,
+                actual: token,
             })
         } else {
             self.consume()
@@ -419,10 +478,13 @@ impl Parser {
     }
 
     fn expect_identifier(&mut self, message: &str) -> ParseResult<(Token, String)> {
+        parser_debug!("Expecting identifier");
         let token = self.get_token()?;
         let TokenType::Identifier(ident) = token.typ.clone() else {
-            return Err(ParseError::WrongToken  {
-                message: format!("Expected an identifier: {:?}\n{}", token.typ, message)
+            parser_debug!("Failed expect identifier, got {:?} instead", token.typ);
+            return Err(ParseError::NotIdentifier {
+                message: message.to_owned(),
+                actual: token,
             });
         };
         self.consume()?;
@@ -430,19 +492,18 @@ impl Parser {
     }
 
     fn expect_keyword(&mut self, expected_kw: KeywordType, message: &str) -> ParseResult<Token> {
+        parser_debug!("Expecting keyword {:?}", expected_kw);
         let token = self.get_token()?;
         let TokenType::Keyword(kw) = &token.typ else {
-            return Err(ParseError::WrongToken  {
-                message: format!("Expected a keyword: {:?}\n{}", token.typ, message)
-            });
+            parser_debug!("Failed expect keyword, got {:?} instead", token.typ);
+            return Err(ParseError::WrongKeyword { message: message.to_owned(), expected: expected_kw, actual: token });
         };
 
         if *kw != expected_kw {
-            return Err(ParseError::WrongToken {
-                message: format!(
-                    "Expected a keyword of type {:?}:\n got: {:?}\n{}",
-                    expected_kw, kw, message
-                ),
+            return Err(ParseError::WrongKeyword {
+                message: message.to_owned(),
+                expected: *kw,
+                actual: token,
             });
         }
         self.consume()?;
@@ -452,6 +513,8 @@ impl Parser {
     fn consume(&mut self) -> ParseResult<Token> {
         let previous_token = self.get_token()?;
 
+        parser_debug!("Consumed {}", previous_token);
+
         self.idx += 1;
         self.cur_token = self.tokens.get(self.idx).cloned();
 
@@ -459,6 +522,7 @@ impl Parser {
     }
 
     fn consume_newlines(&mut self) -> ParseResult<()> {
+        parser_debug!("Consuming newlines");
         while let Ok(token) = self.get_token() {
             if token.typ == TokenType::NewLine {
                 self.consume()?;
@@ -471,11 +535,11 @@ impl Parser {
 
     fn consume_newline_or_eof(&mut self, message: &str) -> ParseResult<()> {
         if let Err(e) = self.expect(TokenType::NewLine, message) {
-            return if e == ParseError::EndOfStream {
+            return if let ParseError::EndOfStream = e {
                 Ok(())
             } else {
                 Err(e)
-            }
+            };
         }
         Ok(())
     }
@@ -500,6 +564,7 @@ impl Parser {
     }
 
     fn at_end(&mut self) -> bool {
+        parser_debug!("Check if at end");
         self.cur_token.is_none()
     }
 }
