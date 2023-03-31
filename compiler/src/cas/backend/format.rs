@@ -1,8 +1,8 @@
 use matex_common::node::Precedence;
 
-use crate::cas::backend::runtime::{Factors, Terms};
+use crate::cas::backend::value::{Factors, Terms};
 
-use super::runtime::RuntimeVal;
+use super::value::RuntimeVal;
 
 pub trait ValueFormatter {
     fn format(value: &RuntimeVal) -> String;
