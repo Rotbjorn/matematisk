@@ -30,7 +30,7 @@ impl NormalFormatter {
                     s.clone()
                 }
             }
-            Bool(b) => format!(" + {}", b.to_string()),
+            Bool(b) => format!(" + {}", b),
             Sum(Terms(terms)) => {
                 let mut buffer = String::new();
                 for (i, term) in terms.iter().enumerate() {
@@ -45,7 +45,7 @@ impl NormalFormatter {
                     return format!("({})", buffer);
                 }
 
-                return buffer;
+                buffer
             }
             Product(Factors(factors)) => {
                 let mut vec = Vec::new();
@@ -68,9 +68,9 @@ impl NormalFormatter {
                 let mul_string = vec.join(" * ");
 
                 if prec == Precedence::Term {
-                    return format!(" {} {}", if negative_term { "-" } else { "+" }, mul_string);
+                    format!(" {} {}", if negative_term { "-" } else { "+" }, mul_string)
                 } else {
-                    return format!("{}{}", if negative_term { "-" } else { "" }, mul_string);
+                    format!("{}{}", if negative_term { "-" } else { "" }, mul_string)
                 }
             }
             Exponent(base, exp) => {
@@ -78,11 +78,11 @@ impl NormalFormatter {
                 let exp_str = Self::format(exp);
 
                 let str = base_str + "^" + exp_str.as_str();
-                return if prec == Precedence::Term {
+                if prec == Precedence::Term {
                     format!(" + {}", str)
                 } else {
                     str
-                };
+                }
             }
         }
     }

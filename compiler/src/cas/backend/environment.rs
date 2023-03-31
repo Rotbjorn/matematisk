@@ -1,23 +1,20 @@
-use std::cell::RefCell;
-use std::rc::Rc;
-
 use matex_common::{function::Function, util::SymbolTable};
 
 use super::value::RuntimeVal;
 
 #[derive(Default, Debug)]
 pub struct Environment {
-    pub scopes: Vec<Rc<RefCell<Scope>>>,
+    pub scopes: Vec<Scope>,
 }
 
 impl Environment {
-    pub fn get_scope(&self) -> Rc<RefCell<Scope>> {
-        let Some(scope) = self.scopes.last() else {
+    pub fn get_scope(&mut self) -> &mut Scope {
+        let Some(scope) = self.scopes.last_mut() else {
             panic!("No scope?!");
         };
-        Rc::clone(scope)
+        scope
     }
-    pub fn push_scope(&mut self, scope: Rc<RefCell<Scope>>) {
+    pub fn push_scope(&mut self, scope: Scope) {
         self.scopes.push(scope);
     }
 

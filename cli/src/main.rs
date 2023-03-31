@@ -4,7 +4,7 @@ use std::{
     process::exit,
 };
 
-use matex_common::node::{ASTGraphGenerator, Visitor};
+use matex_common::node::ASTGraphGenerator;
 use matex_compiler::cas::{
     backend::runtime::Runtime,
     frontend::{lexer, parser},
@@ -53,19 +53,19 @@ fn main() {
 
         let result = parser.parse();
 
-        let Ok(ast) = result else {
+        let Ok(program) = result else {
             let error = result.err().unwrap();
             eprintln!("{}", error);
             exit(-1);
         };
 
-        println!("Node: --------\n{:?}\n--------", ast);
+        println!("Program: --------\n{:?}\n--------", program);
 
         if let Some(outfile_path) = args.ast {
             let mut graph_buf = String::new();
 
             ASTGraphGenerator::new(&mut graph_buf)
-                .create_dot_graph(&ast)
+                .create_dot_graph(&program)
                 .expect("Failed to create graph");
 
             println!("Graph generated --- \n{}", graph_buf);
@@ -77,7 +77,7 @@ fn main() {
 
         let mut runtime = Runtime::new();
 
-        let exit_value = runtime.visit_statement(&ast);
+        let exit_value = runtime.run(&program);
 
         println!("EXIT VALUE: {:?}", exit_value);
     } else {

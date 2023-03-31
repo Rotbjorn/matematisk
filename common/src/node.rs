@@ -1,17 +1,16 @@
 use std::fmt::{Error, Write};
 
-use crate::{function::Parameter, token::TokenType};
+use crate::{function::Function, token::TokenType};
 
 type Statements = Vec<Statement>;
 
+
+#[derive(Debug)]
+pub struct Program(pub Statements);
+
 #[derive(Debug)]
 pub enum Statement {
-    Program(Statements),
-    Function {
-        name: String,
-        parameters: Vec<Parameter>,
-        body: Expr,
-    },
+    FunctionDefinition(Function),
     Expression(Expr),
 }
 
@@ -130,14 +129,21 @@ impl<'a, W: Write> ASTGraphGenerator<'a, W> {
         Self { count: 0, out }
     }
 
-    pub fn create_dot_graph(&mut self, stmt: &Statement) -> Result<(), Error> {
+    pub fn create_dot_graph(&mut self, Program(statements): &Program) -> Result<(), Error> {
         self.out.write_str("digraph AST {\n")?;
         self.out.write_str("\tlabel = \"Abstract Syntax Tree\"\n")?;
         self.out.write_str("\tfontname = \"Arial\"\n")?;
         self.out.write_str("\tnode [fontname = \"Arial\"]\n")?;
         self.out.write_str("\tedge [fontname = \"Arial\"]\n\n")?;
 
-        self.visit_statement(stmt)?;
+
+        let current = self.count;
+        self.create_node("<>")?;
+
+        for (index, statement) in statements.iter().enumerate() {
+            let node = self.visit_statement(statement)?;
+            self.create_edge_label(current, node, &index.to_string())?;
+        }
 
         self.out.write_char('}')?;
 
@@ -167,20 +173,12 @@ impl<'a, W: Write> Visitor<Result<u32, Error>> for ASTGraphGenerator<'a, W> {
     fn visit_statement(&mut self, statement: &Statement) -> Result<u32, Error> {
         let current = self.count;
         match statement {
-            Statement::Program(v) => {
-                self.create_node("<>")?;
 
-                for (index, statement) in v.iter().enumerate() {
-                    let node = self.visit_statement(statement)?;
-                    self.create_edge_label(current, node, &index.to_string())?;
-                }
-            }
-
-            Statement::Function {
+            Statement::FunctionDefinition(Function {
                 name,
-                parameters: _,
+                params: _,
                 body,
-            } => {
+            }) => {
                 self.create_node(&format!("func: {}", name))?;
 
                 let body = self.visit_expr(body)?;

@@ -1,38 +1,40 @@
-use std::cell::RefCell;
-use std::ops::Deref;
-use std::rc::Rc;
-
 use matex_common::function::{Function, Parameter};
-use matex_common::node::{BinOp, Expr, Statement};
+use matex_common::node::{BinOp, Expr, Statement, Program};
 
 use matex_common::node::Visitor;
+
+use log::{debug, error};
 
 use super::environment::{Environment, Scope};
 use super::value::RuntimeVal;
 
+macro_rules! runtime_debug {
+    ($($arg:tt)+) => (debug!(target: "matex::runtime", $($arg)+));
+}
+
+macro_rules! runtime_error {
+    ($($arg:tt)+) => (error!(target: "matex::runtime", $($arg)+));
+}
 pub struct Runtime {
     pub environment: Environment,
 }
 
 impl Runtime {
-    pub fn run(&mut self, program: &Statement) -> RuntimeVal {
-        let Statement::Program(v) = program else {
-            return RuntimeVal::Unit;
-        };
-        self.visit_program(&v)
+    pub fn run(&mut self, program: &Program) -> RuntimeVal {
+        self.visit_program(program)
     }
 
     pub fn new() -> Self {
         Self {
             environment: Environment {
-                scopes: vec![Rc::new(RefCell::new(Scope::default()))],
+                scopes: vec![Scope::default()],
             },
         }
     }
 }
 
 impl Runtime {
-    fn visit_program(&mut self, statements: &Vec<Statement>) -> RuntimeVal {
+    fn visit_program(&mut self, Program(statements): &Program) -> RuntimeVal {
         let mut value = RuntimeVal::Number(-1.0);
         for statement in statements {
             value = self.visit_statement(statement);
@@ -43,19 +45,29 @@ impl Runtime {
 
     fn visit_function(
         &mut self,
-        _func_name: &str,
-        _params: &Vec<Parameter>,
-        _function_body: &Expr,
+        func_name: &str,
+        params: &Vec<Parameter>,
+        function_body: &Expr,
     ) -> RuntimeVal {
-        // TODO: Just use functions from Parser?
-        /*self.environment.borrow_mut().functions
-            .insert(func_name.to_owned(), function_body.clone());
-        */
+        runtime_debug!("Visit function declaration");
+        runtime_debug!("func_name: {}", func_name);
+        runtime_debug!("params: {:?}", params);
+        runtime_debug!("body: {:?}", function_body);
+
+        let function = Function {
+            name: func_name.to_owned(),
+            params: params.clone(),
+            body: function_body.clone(),
+        };
+        self.environment.get_scope().functions.insert(func_name.to_owned(), function);
         RuntimeVal::Unit
     }
 
     fn visit_variable(&mut self, name: &String) -> RuntimeVal {
-        if let Some(variable) = self.environment.get_scope().borrow().variables.get(name) {
+        runtime_debug!("Visit variable");
+        runtime_debug!("name: {}", name);
+
+        if let Some(variable) = self.environment.get_scope().variables.get(name) {
             variable.clone()
         } else {
             RuntimeVal::Symbol(name.clone())
@@ -63,6 +75,9 @@ impl Runtime {
     }
 
     fn visit_unary_operation(&mut self, expr: &Expr) -> RuntimeVal {
+        runtime_debug!("Visit unary operation");
+        runtime_debug!("expr: {:?}", expr);
+
         let expr = self.visit_expr(expr);
 
         let value = expr.multiply(RuntimeVal::Number(-1.0));
@@ -76,6 +91,11 @@ impl Runtime {
         operation: &BinOp,
         right: &Expr,
     ) -> RuntimeVal {
+        runtime_debug!("Visit binary operation");
+        runtime_debug!("left: {:?}", left);
+        runtime_debug!("operation: {:?}", operation);
+        runtime_debug!("right: {:?}", right);
+        
         let lhs = self.visit_expr(left);
         let rhs = self.visit_expr(right);
 
@@ -97,7 +117,10 @@ impl Runtime {
             BinOp::Greater => lhs.greater(rhs),
             BinOp::GreaterEqual => lhs.greater_equal(rhs),
 
-            _ => panic!("Not a valid binary operation!!!"),
+            _ => {
+                runtime_error!("Not a valid binary operation");
+                panic!();
+            },
         };
 
         // dbg!(&value);
@@ -106,8 +129,11 @@ impl Runtime {
     }
 
     fn visit_assignment(&mut self, holder: &Expr, value: &Expr) -> RuntimeVal {
+        runtime_debug!("Visit assignment");
+        runtime_debug!("holder: {:?}", holder);
+        runtime_debug!("value: {:?}", value);
         // TODO: Move ownership instead?
-        let Expr::Variable(holder) = holder.deref() else {
+        let Expr::Variable(holder) = holder else {
             panic!("Unhandled holder expression");
         };
 
@@ -117,7 +143,6 @@ impl Runtime {
 
         self.environment
             .get_scope()
-            .borrow_mut()
             .variables
             .insert(holder.clone(), value.clone());
 
@@ -125,6 +150,11 @@ impl Runtime {
     }
 
     fn visit_if(&mut self, condition: &Expr, body: &Expr, else_body: &Expr) -> RuntimeVal {
+        runtime_debug!("Visit if");
+        runtime_debug!("condition: {:?}", condition);
+        runtime_debug!("body: {:?}", body);
+        runtime_debug!("else: {:?}", else_body);
+        
         let condition = self.visit_expr(condition);
 
         let RuntimeVal::Bool(b) = condition else {
@@ -142,9 +172,11 @@ impl Runtime {
     }
 
     fn visit_function_call(&mut self, name: &String, arguments: &Vec<Expr>) -> RuntimeVal {
-        let binding = self.environment.get_scope();
-        let binding = binding.borrow_mut();
-        let Some(Function { name: _, params, body }) = binding.functions.get(name).clone() else {
+        runtime_debug!("Visit function call");
+        runtime_debug!("func_name: {}", name);
+        runtime_debug!("func_args: {:?}", arguments);
+
+        let Some(Function { name: _, params, body }) = self.environment.get_scope().functions.get(name).cloned() else {
             return RuntimeVal::Unit;
         };
 
@@ -155,8 +187,11 @@ impl Runtime {
             new_scope.variables.insert(param.name.clone(), val);
         }
 
+        runtime_debug!("Function arguments passed");
+        runtime_debug!("vars: {:?}", new_scope.variables);
+
         self.environment
-            .push_scope(Rc::new(RefCell::new(new_scope)));
+            .push_scope(new_scope);
 
         let value = self.visit_expr(&body);
 
@@ -168,14 +203,15 @@ impl Runtime {
 }
 
 impl Visitor<RuntimeVal> for Runtime {
+    // TODO: Take ownership instead, since statements are never visited twice
+    // Make sure Program is its own type, and not a statement.
     fn visit_statement(&mut self, statement: &Statement) -> RuntimeVal {
         match statement {
-            Statement::Program(statements) => self.visit_program(statements),
-            Statement::Function {
+            Statement::FunctionDefinition(Function {
                 name,
-                parameters: params,
+                params,
                 body: function_body,
-            } => self.visit_function(name, params, function_body),
+            }) => self.visit_function(name, params, function_body),
             Statement::Expression(expr) => self.visit_expr(expr),
         }
     }
@@ -191,7 +227,7 @@ impl Visitor<RuntimeVal> for Runtime {
 
                 expr.simplify();
 
-                return expr;
+                expr
             }
             Expr::BinaryOp {
                 left,

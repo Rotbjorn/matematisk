@@ -1,6 +1,6 @@
 use std::{fs::File, io::Write, str::FromStr};
 
-use matex_common::node::{ASTGraphGenerator, Statement};
+use matex_common::node::{ASTGraphGenerator, Program};
 
 use matex_compiler::cas::{
     backend::{
@@ -47,13 +47,6 @@ impl REPL {
             let result = parser.parse();
             match result {
                 Ok(ast) => {
-                    self.runtime
-                        .environment
-                        .get_scope()
-                        .borrow_mut()
-                        .functions
-                        .extend(parser.parsed.functions);
-
                     let exit_value = self.runtime.run(&ast);
 
                     dbg!(&exit_value);
@@ -122,17 +115,17 @@ impl Command {
         CommandResult::None
     }
 
-    fn run_parser(&self) -> Result<Statement, ()> {
+    fn run_parser(&self) -> Result<Program, ()> {
         let tokens = lexer::Lexer::new(&self.input).collect();
         let result = parser::Parser::new(tokens).parse();
 
-        let Ok(ast) = result else {
+        let Ok(program) = result else {
                     let error = result.err().unwrap();
                     eprintln!("{:?}", error);
                     return Err(());
                 };
 
-        Ok(ast)
+        Ok(program)
     }
 }
 

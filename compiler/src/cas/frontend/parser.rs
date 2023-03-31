@@ -4,7 +4,7 @@ use log::{debug, error};
 use matex_common::{
     error::ParseError,
     function::{Function, Parameter},
-    node::{BinOp, Expr, Precedence, Statement},
+    node::{BinOp, Expr, Precedence, Statement, Program},
     token::{KeywordType, Token, TokenType},
     util::SymbolTable,
 };
@@ -47,7 +47,7 @@ impl Parser {
         }
     }
 
-    pub fn parse(&mut self) -> ParseResult<Statement> {
+    pub fn parse(&mut self) -> ParseResult<Program> {
         use ParseError::*;
         let mut nodes: Vec<Statement> = Vec::new();
 
@@ -67,7 +67,7 @@ impl Parser {
                 },
             }
         }
-        Ok(Statement::Program(nodes))
+        Ok(Program(nodes))
     }
 }
 
@@ -113,8 +113,14 @@ impl Parser {
             "Expected opening parenthesis after function name",
         )?;
 
-        // TODO: Loop parameter parsing
-        let (param_name, type_name) = self.parse_parameter_definition()?;
+        let param = self.parse_parameter_definition()?;
+        let mut params = vec![param];
+
+
+        while let TokenType::Comma = self.get_token()?.typ {
+            let param = self.parse_parameter_definition()?;
+            params.push(param);
+        }
 
         self.expect(
             TokenType::RightParenthesis,
@@ -130,32 +136,32 @@ impl Parser {
 
         // TODO: Add function to consume newline OR end of stream.
         // I.E. functions at the end of the file should parse expectedly, and not fail just because no newline character
+        self.consume_newline_or_eof("Expected newline after function definition")?;
+        /* PREVIOUS CODE:
         let _ = self.expect(
             TokenType::NewLine,
             "Expected newline after function definition.",
-        );
+        );*/
+
 
         // TODO: A lot of clones...
         self.parsed.functions.insert(
             func_name.clone(),
             Function {
                 name: func_name.clone(),
-                params: vec![Parameter {
-                    name: param_name,
-                    type_name,
-                }],
+                params: params.clone(),
                 body: function_body.clone(),
             },
         );
 
-        Ok(Statement::Function {
+        Ok(Statement::FunctionDefinition(Function {
             name: func_name,
-            parameters: Vec::default(), // FIXME: Add parameter name and types to HashMap...+
+            params: params.clone(), 
             body: function_body,
-        })
+        }))
     }
 
-    fn parse_parameter_definition(&mut self) -> ParseResult<(String, String)> {
+    fn parse_parameter_definition(&mut self) -> ParseResult<Parameter> {
         parser_debug!("Parsing parameter definition");
         let (_, param_name) = self.expect_identifier("Expected parameter name")?;
 
@@ -164,7 +170,12 @@ impl Parser {
 
         let (_, type_name) = self.expect_identifier("Expected type name after semicolon.")?;
 
-        Ok((param_name, type_name))
+        let param = Parameter {
+            name: param_name,
+            type_name
+        };
+
+        Ok(param)
     }
 
     fn parse_expression(&mut self) -> ParseResult<Expr> {

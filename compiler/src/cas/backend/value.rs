@@ -39,12 +39,12 @@ impl RuntimeVal {
 
             (Sum(Terms(v)), _) => {
                 v.push_back(other);
-                return self;
+                self
             }
 
             (_, Sum(Terms(v))) => {
                 v.push_back(self);
-                return other;
+                other
             }
 
             (Number(_), Symbol(_))
@@ -62,7 +62,7 @@ impl RuntimeVal {
             | (Exponent(_, _), Symbol(_))
             | (Exponent(_, _), Product(_))
             | (Exponent(_, _), Exponent(_, _)) => {
-                return RuntimeVal::Sum(Terms(VecDeque::from([self, other])));
+                RuntimeVal::Sum(Terms(VecDeque::from([self, other])))
             }
         }
     }
@@ -77,12 +77,12 @@ impl RuntimeVal {
 
             (Product(Factors(v)), _) => {
                 v.push_back(other);
-                return self;
+                self
             }
 
             (_, Product(Factors(v))) => {
                 v.push_back(self);
-                return other;
+                other
             }
 
             (Number(_), Symbol(_))
@@ -100,7 +100,7 @@ impl RuntimeVal {
             | (Exponent(_, _), Symbol(_))
             | (Exponent(_, _), Sum(_))
             | (Exponent(_, _), Exponent(_, _)) => {
-                return RuntimeVal::Product(Factors(VecDeque::from([self, other])));
+                RuntimeVal::Product(Factors(VecDeque::from([self, other])))
             }
         }
     }
@@ -137,7 +137,7 @@ impl RuntimeVal {
             | (Exponent(_, _), Sum(_))
             | (Exponent(_, _), Product(_))
             | (Exponent(_, _), Exponent(_, _)) => {
-                return Exponent(Box::new(self), Box::new(other));
+                Exponent(Box::new(self), Box::new(other))
             }
         }
     }
@@ -277,19 +277,19 @@ impl RuntimeVal {
         terms.sort_by(|a, b| {
             dbg!(&a);
             dbg!(&b);
-            return match (a, b) {
+            match (a, b) {
                 (_, Product(factors)) => {
-                    return if RuntimeVal::product_is_negative(&factors) {
+                    return if RuntimeVal::product_is_negative(factors) {
                         Ordering::Less
                     } else {
                         Ordering::Greater
                     }
                 }
-                (Product(factors), _) if RuntimeVal::product_is_negative(&factors) => {
+                (Product(factors), _) if RuntimeVal::product_is_negative(factors) => {
                     Ordering::Greater
                 }
                 (_, _) => Ordering::Less,
-            };
+            }
         });
         dbg!(&terms);
     }
@@ -315,21 +315,18 @@ impl RuntimeVal {
 
                 let mut terms_remaining = other.iter().collect::<Vec<_>>();
 
-                for term in terms {
-                    let mut found_match = false;
+                'outer: for term in terms {
                     for i in 0..terms_remaining.len() {
                         let other_term = &terms_remaining[i];
                         if term.struct_equal(other_term) {
-                            found_match = true;
                             terms_remaining.remove(i);
-                            break;
+                            continue 'outer;
                         }
                     }
 
-                    return found_match;
+                    return false
                 }
 
-                eprintln!("Sum(terms) was empty?!");
                 true
             }
             (RuntimeVal::Product(Factors(factors)), RuntimeVal::Product(Factors(other))) => {
@@ -340,24 +337,22 @@ impl RuntimeVal {
                 // Verify that the vectors `factors` and `other` are structurally equal:
                 let mut factors_remaining = other.iter().collect::<Vec<_>>();
 
-                for factor in factors {
-                    let mut found_match = false;
+                'outer: for factor in factors {
                     for i in 0..factors_remaining.len() {
                         let other_term = &factors_remaining[i];
                         if factor.struct_equal(other_term) {
-                            found_match = true;
                             factors_remaining.remove(i);
-                            break;
+                            continue 'outer;
                         }
                     }
 
-                    return found_match;
+                    return false
                 }
 
                 true
             }
             (RuntimeVal::Exponent(base, exp), RuntimeVal::Exponent(other_base, other_exp)) => {
-                return base.struct_equal(other_base) && exp.struct_equal(other_exp)
+                base.struct_equal(other_base) && exp.struct_equal(other_exp)
             }
             (RuntimeVal::Number(num), RuntimeVal::Number(other)) => num == other,
             (RuntimeVal::Symbol(symbol), RuntimeVal::Symbol(other)) => symbol == other,
@@ -420,14 +415,14 @@ impl RuntimeVal {
     }
 }
 
-impl Into<RuntimeVal> for String {
-    fn into(self) -> RuntimeVal {
-        RuntimeVal::Symbol(self)
+impl From<String> for RuntimeVal {
+    fn from(val: String) -> Self {
+        RuntimeVal::Symbol(val)
     }
 }
 
-impl Into<RuntimeVal> for f64 {
-    fn into(self) -> RuntimeVal {
-        RuntimeVal::Number(self)
+impl From<f64> for RuntimeVal {
+    fn from(value: f64) -> Self {
+        RuntimeVal::Number(value)
     }
 }
