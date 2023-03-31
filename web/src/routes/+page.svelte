@@ -1,5 +1,5 @@
 <script lang=ts>
-    import { run } from "matex-web";
+    import { run } from "matex-gui";
     import EguiCanvas from "../lib/components/EguiCanvas.svelte";
 
 

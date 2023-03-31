@@ -1,8 +1,5 @@
 #![cfg(target_arch = "wasm32")]
 
-mod app;
-pub use app::MatexApp;
-
 use eframe::wasm_bindgen::prelude::wasm_bindgen;
 use matex_compiler::cas::{
     backend::{
@@ -11,6 +8,8 @@ use matex_compiler::cas::{
     },
     frontend::{lexer::Lexer, parser::Parser},
 };
+
+use crate::app::app::MatexApp;
 
 #[wasm_bindgen]
 pub fn new_debug_app(canvas_id: String) {

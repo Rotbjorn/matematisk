@@ -24,6 +24,6 @@
 	},
 	"type": "module",
 	"dependencies": {
-		"matex-web": "file:../pkg"
+		"matex-gui": "file:../gui/pkg"
 	}
 }

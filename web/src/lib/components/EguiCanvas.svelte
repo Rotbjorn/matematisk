@@ -1,5 +1,5 @@
 <script lang=ts>
-    import * as wasm from 'matex-web'
+    import * as wasm from 'matex-gui'
 
     export let width: string | number = "100%";
     export let height: string | number = "100%";
