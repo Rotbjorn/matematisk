@@ -1,7 +1,10 @@
 use eframe::App;
 use egui::{TextEdit, Ui};
 use matex_compiler::cas::{
-    backend::{runtime::Runtime, format::{ValueFormatter, NormalFormatter}},
+    backend::{
+        format::{NormalFormatter, ValueFormatter},
+        runtime::Runtime,
+    },
     frontend::{lexer::Lexer, parser::Parser},
 };
 
@@ -27,7 +30,7 @@ impl Default for MatexApp {
         Self {
             source: "".to_owned(),
             executed: Vec::new(),
-            runtime: Runtime::default(),
+            runtime: Runtime::new(),
         }
     }
 }
@@ -46,8 +49,10 @@ impl App for MatexApp {
             if ui.button("Run").clicked() {
                 if let Ok(program) = Parser::new(Lexer::new(&self.source).collect()).parse() {
                     let last_value = self.runtime.run(&program);
-                    self.executed
-                        .push((self.source.clone(), format!("{}", NormalFormatter::format(&last_value))));
+                    self.executed.push((
+                        self.source.clone(),
+                        format!("{}", NormalFormatter::format(&last_value)),
+                    ));
                     self.source.clear();
                 }
             }
@@ -66,15 +71,15 @@ impl App for MatexApp {
             });
             */
         });
-        
+
         egui::Window::new("Environment").show(ctx, |ui| {
             ui.label("Functions:");
-            for (key, value) in &self.runtime.functions {
+            for (key, value) in &self.runtime.environment.get_scope().borrow().functions {
                 ui.label(format!("{}: {:?}", key, value));
             }
             ui.separator();
             ui.label("Variables:");
-            for (key, value) in &self.runtime.variables {
+            for (key, value) in &self.runtime.environment.get_scope().borrow().variables {
                 ui.label(format!("{}: {}", key, NormalFormatter::format(value)));
             }
         });

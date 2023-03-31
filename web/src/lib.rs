@@ -5,7 +5,10 @@ pub use app::MatexApp;
 
 use eframe::wasm_bindgen::prelude::wasm_bindgen;
 use matex_compiler::cas::{
-    backend::{runtime::{Runtime}, format::{NormalFormatter, ValueFormatter}},
+    backend::{
+        format::{NormalFormatter, ValueFormatter},
+        runtime::Runtime,
+    },
     frontend::{lexer::Lexer, parser::Parser},
 };
 
@@ -33,7 +36,7 @@ pub fn run(source: String) -> String {
     let mut parser = Parser::new(Lexer::new(&source).collect());
     match parser.parse() {
         Ok(program) => {
-            let mut rt = Runtime::default();
+            let mut rt = Runtime::new();
             let value = rt.run(&program);
             let str_value = format!("{}", NormalFormatter::format(&value));
             return str_value;
