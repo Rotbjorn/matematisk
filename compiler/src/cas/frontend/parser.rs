@@ -4,7 +4,7 @@ use log::{debug, error};
 use matex_common::{
     error::ParseError,
     function::{Function, Parameter},
-    node::{BinOp, Expr, Precedence, Statement, Program},
+    node::{BinOp, Expr, Precedence, Program, Statement},
     token::{KeywordType, Token, TokenType},
     util::SymbolTable,
 };
@@ -116,8 +116,8 @@ impl Parser {
         let param = self.parse_parameter_definition()?;
         let mut params = vec![param];
 
-
         while let TokenType::Comma = self.get_token()?.typ {
+            self.consume()?;
             let param = self.parse_parameter_definition()?;
             params.push(param);
         }
@@ -143,7 +143,6 @@ impl Parser {
             "Expected newline after function definition.",
         );*/
 
-
         // TODO: A lot of clones...
         self.parsed.functions.insert(
             func_name.clone(),
@@ -156,7 +155,7 @@ impl Parser {
 
         Ok(Statement::FunctionDefinition(Function {
             name: func_name,
-            params: params.clone(), 
+            params: params.clone(),
             body: function_body,
         }))
     }
@@ -172,7 +171,7 @@ impl Parser {
 
         let param = Parameter {
             name: param_name,
-            type_name
+            type_name,
         };
 
         Ok(param)

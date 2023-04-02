@@ -1,5 +1,5 @@
 use matex_common::function::{Function, Parameter};
-use matex_common::node::{BinOp, Expr, Statement, Program};
+use matex_common::node::{BinOp, Expr, Program, Statement};
 
 use matex_common::node::Visitor;
 
@@ -59,7 +59,10 @@ impl Runtime {
             params: params.clone(),
             body: function_body.clone(),
         };
-        self.environment.get_scope().functions.insert(func_name.to_owned(), function);
+        self.environment
+            .get_scope()
+            .functions
+            .insert(func_name.to_owned(), function);
         RuntimeVal::Unit
     }
 
@@ -95,7 +98,7 @@ impl Runtime {
         runtime_debug!("left: {:?}", left);
         runtime_debug!("operation: {:?}", operation);
         runtime_debug!("right: {:?}", right);
-        
+
         let lhs = self.visit_expr(left);
         let rhs = self.visit_expr(right);
 
@@ -120,7 +123,7 @@ impl Runtime {
             _ => {
                 runtime_error!("Not a valid binary operation");
                 panic!();
-            },
+            }
         };
 
         // dbg!(&value);
@@ -154,7 +157,7 @@ impl Runtime {
         runtime_debug!("condition: {:?}", condition);
         runtime_debug!("body: {:?}", body);
         runtime_debug!("else: {:?}", else_body);
-        
+
         let condition = self.visit_expr(condition);
 
         let RuntimeVal::Bool(b) = condition else {
@@ -190,8 +193,7 @@ impl Runtime {
         runtime_debug!("Function arguments passed");
         runtime_debug!("vars: {:?}", new_scope.variables);
 
-        self.environment
-            .push_scope(new_scope);
+        self.environment.push_scope(new_scope);
 
         let value = self.visit_expr(&body);
 
