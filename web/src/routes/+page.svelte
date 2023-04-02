@@ -7,7 +7,7 @@
 
     function onClick() {
         let output = run(source_text)
-        alert(output)
+        alert(JSON.stringify(output))
     }
 </script>
 

@@ -20,8 +20,8 @@
         margin-right: auto;
         margin-left: auto;
 
-        width: 100%;
-        height: 100%;
+        width: 100% !important;
+        height: 100% !important;
         position: static !important; 
     }
 </style>
