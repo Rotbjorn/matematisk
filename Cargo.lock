@@ -1374,6 +1374,9 @@ dependencies = [
 [[package]]
 name = "matex-common"
 version = "0.1.0"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "matex-compiler"
@@ -1381,6 +1384,8 @@ version = "0.1.0"
 dependencies = [
  "log",
  "matex-common",
+ "serde",
+ "wasm-bindgen",
 ]
 
 [[package]]
@@ -1392,6 +1397,7 @@ dependencies = [
  "egui",
  "matex-common",
  "matex-compiler",
+ "serde-wasm-bindgen",
  "tracing-wasm",
  "wasm-bindgen",
  "wasm-bindgen-futures",
@@ -1954,6 +1960,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3c04e8343c3daeec41f58990b9d77068df31209f2af111e059e9fe9646693065"
 dependencies = [
  "serde_derive",
+]
+
+[[package]]
+name = "serde-wasm-bindgen"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f3b143e2833c57ab9ad3ea280d21fd34e285a42837aeb0ee301f4f41890fa00e"
+dependencies = [
+ "js-sys",
+ "serde",
+ "wasm-bindgen",
 ]
 
 [[package]]

@@ -4,7 +4,6 @@ use crate::{function::Function, token::TokenType};
 
 type Statements = Vec<Statement>;
 
-
 #[derive(Debug)]
 pub struct Program(pub Statements);
 
@@ -136,7 +135,6 @@ impl<'a, W: Write> ASTGraphGenerator<'a, W> {
         self.out.write_str("\tnode [fontname = \"Arial\"]\n")?;
         self.out.write_str("\tedge [fontname = \"Arial\"]\n\n")?;
 
-
         let current = self.count;
         self.create_node("<>")?;
 
@@ -173,7 +171,6 @@ impl<'a, W: Write> Visitor<Result<u32, Error>> for ASTGraphGenerator<'a, W> {
     fn visit_statement(&mut self, statement: &Statement) -> Result<u32, Error> {
         let current = self.count;
         match statement {
-
             Statement::FunctionDefinition(Function {
                 name,
                 params: _,

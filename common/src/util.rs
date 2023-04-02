@@ -1,6 +1,10 @@
 use std::{collections::HashMap, fmt::Display};
 
+#[cfg(target_arch = "wasm32")]
+use serde::Serialize;
+
 #[derive(Debug, Clone, Copy)]
+#[cfg_attr(target_arch = "wasm32", derive(Serialize))]
 pub struct Position {
     pub row: usize,
     pub col: usize,

@@ -1,8 +1,11 @@
 use std::{fmt::Display, str::FromStr};
 
 use crate::util::Position;
+#[cfg(target_arch = "wasm32")]
+use serde::Serialize;
 
 #[derive(Debug, Clone)]
+#[cfg_attr(target_arch = "wasm32", derive(Serialize))]
 pub struct Token {
     pub typ: TokenType,
     pub pos: Position,
@@ -21,7 +24,7 @@ impl Display for Token {
 }
 
 #[derive(Debug, Clone)]
-#[allow(dead_code)]
+#[cfg_attr(target_arch = "wasm32", derive(Serialize))]
 pub enum TokenType {
     Number(f64),
     Identifier(String),
@@ -63,6 +66,7 @@ impl PartialEq for TokenType {
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
+#[cfg_attr(target_arch = "wasm32", derive(Serialize))]
 pub enum KeywordType {
     If,
     Else,

@@ -2,8 +2,12 @@ use std::fmt::Display;
 
 use crate::token::{KeywordType, Token, TokenType};
 
+#[cfg(target_arch = "wasm32")]
+use serde::Serialize;
+
 // TODO: Contain positon where error occured?
 #[derive(Debug, Clone)]
+#[cfg_attr(target_arch = "wasm32", derive(Serialize))]
 pub enum ParseError {
     WrongToken {
         message: String,

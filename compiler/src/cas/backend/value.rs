@@ -1,9 +1,13 @@
 use std::{cmp::Ordering, collections::VecDeque};
 
+#[cfg(target_arch = "wasm32")]
+use serde::{Deserialize, Serialize};
+
 use super::format::ValueFormatter;
 
 #[derive(Clone, Debug, PartialEq)]
 // Better name
+#[cfg_attr(target_arch = "wasm32", derive(Serialize, Deserialize))]
 pub enum RuntimeVal {
     Unit,
 
@@ -19,8 +23,11 @@ pub enum RuntimeVal {
 }
 
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(target_arch = "wasm32", derive(Serialize, Deserialize))]
 pub struct Factors(pub VecDeque<RuntimeVal>);
+
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(target_arch = "wasm32", derive(Serialize, Deserialize))]
 pub struct Terms(pub VecDeque<RuntimeVal>);
 
 impl RuntimeVal {
@@ -136,9 +143,7 @@ impl RuntimeVal {
             | (Exponent(_, _), Symbol(_))
             | (Exponent(_, _), Sum(_))
             | (Exponent(_, _), Product(_))
-            | (Exponent(_, _), Exponent(_, _)) => {
-                Exponent(Box::new(self), Box::new(other))
-            }
+            | (Exponent(_, _), Exponent(_, _)) => Exponent(Box::new(self), Box::new(other)),
         }
     }
     pub(crate) fn less(self, other: RuntimeVal) -> RuntimeVal {
@@ -262,8 +267,9 @@ impl RuntimeVal {
             }
         }
 
-        if total == 0.0 {
+        if total == 0.0 && terms.len() != 0 {
             return;
+            // If there are no terms left, then add the zero as the only term.
         }
 
         let constant = RuntimeVal::Number(total);
@@ -324,7 +330,7 @@ impl RuntimeVal {
                         }
                     }
 
-                    return false
+                    return false;
                 }
 
                 true
@@ -346,7 +352,7 @@ impl RuntimeVal {
                         }
                     }
 
-                    return false
+                    return false;
                 }
 
                 true
