@@ -49,7 +49,6 @@ impl REPL {
                 Ok(ast) => {
                     let exit_value = self.runtime.run(&ast);
 
-                    dbg!(&exit_value);
                     let formatted_value = NormalFormatter::format(&exit_value);
 
                     println!("u> {:?}", exit_value);
