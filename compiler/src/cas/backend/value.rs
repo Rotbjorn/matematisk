@@ -1,9 +1,9 @@
-use std::{cmp::Ordering, collections::VecDeque, fmt::{Debug, Write, self}};
+use std::{cmp::Ordering, collections::VecDeque, fmt::{Debug, self}};
 
 #[cfg(target_arch = "wasm32")]
 use serde::{Deserialize, Serialize};
 
-use log::{debug, error};
+use log::{debug};
 use super::format::ValueFormatter;
 
 
@@ -533,6 +533,7 @@ impl RunVal {
     }
 
     pub(crate) fn extract_coefficients(Terms(terms): &mut Terms) -> Vec<(f64, RunVal)> {
+        value_debug!("extracting coeffients: {:?}", terms);
         let mut term_coefficients: Vec<(f64, RunVal)> = Vec::new();
 
         for term in terms {
