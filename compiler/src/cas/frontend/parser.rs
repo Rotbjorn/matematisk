@@ -82,7 +82,8 @@ impl Parser {
     }
     fn parse_statement(&mut self) -> ParseResult<Statement> {
         parser_debug!("Parsing statement");
-        match self.get_token()? {
+        match self.get_token()?.typ {
+            TokenType::Tilde => self.parse_unset_statement(),
             _ => {
                 let expression = Statement::Expression(self.parse_expression()?);
                 self.consume_newline_or_eof("Expected newline after expression statement.")?;
@@ -177,6 +178,18 @@ impl Parser {
         Ok(param)
     }
 
+    fn parse_unset_statement(&mut self) -> ParseResult<Statement> {
+        parser_debug!("Parsing unset statement");
+        self.expect(TokenType::Tilde, "Expected unset operator")?;
+        let (_, symbol) = self.expect_identifier("Expected symbol after unset operator")?;
+
+        let statement = Statement::UnsetVariable(symbol);
+
+        parser_debug!("Returning {:?}", statement);
+
+        Ok(statement)
+    }
+
     fn parse_expression(&mut self) -> ParseResult<Expr> {
         parser_debug!("Parsing expression");
         self.parse_precedence(Precedence::None)
@@ -188,6 +201,7 @@ impl Parser {
         parser_debug!("Parsing expression with precedence: {:?}", prec);
 
         let token = self.get_token()?;
+
         let mut node = match token.typ {
             Number(_) => self.parse_number()?,
             Identifier(_) => self.parse_identifier()?,
@@ -198,9 +212,9 @@ impl Parser {
             RightSquareBracket => todo!("Implement lists"),
             RightBrace => todo!("Implement blocks"),
             LeftBrace => todo!("Implement blocks"),
-            _ => {
-                panic!("\nFailed prefix on: \n{:?}", token);
-            }
+            Plus | Star | Slash | Caret | Equal | EqualEqual | Less | Greater | LessEqual
+            | GreaterEqual | Colon | Semicolon | Tilde | Dot | Comma | RightParenthesis
+            | NewLine => panic!("Failed prefix on: {}", token),
         };
 
         while !self.at_end() && prec <= BinOp::from(&self.get_token()?.typ).precedence() {

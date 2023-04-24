@@ -2,19 +2,20 @@ use matex_common::node::Precedence;
 
 use crate::cas::backend::value::{Factors, Terms};
 
-use super::value::RuntimeVal;
+use super::value::{RunType, RunVal};
 
 pub trait ValueFormatter {
-    fn format(value: &RuntimeVal) -> String;
+    fn format(value: &RunVal) -> String;
 }
 
 pub struct NormalFormatter;
 
 impl NormalFormatter {
-    fn format_impl(value: &RuntimeVal, prec: Precedence) -> String {
-        use RuntimeVal::*;
-        match value {
+    fn format_impl(value: &RunVal, prec: Precedence) -> String {
+        use RunType::*;
+        match &value.typ {
             Unit => "Unit value".to_owned(),
+            Undefined => "Undefined?".to_owned(),
             Number(n) if prec == Precedence::Term => {
                 if n.is_sign_negative() {
                     format!(" - {}", -n)
@@ -53,13 +54,13 @@ impl NormalFormatter {
                 let mut negative_term = false;
 
                 for factor in factors {
-                    if let Number(n) = factor {
+                    if let Number(n) = factor.typ {
                         if n.is_sign_negative() {
                             negative_term = !negative_term;
-                            if *n == -1.0 {
+                            if n == -1.0 {
                                 continue;
                             }
-                            vec.push(Self::format_impl(&Number(-n), Precedence::Factor));
+                            vec.push(Self::format_impl(&Number(-n).into(), Precedence::Factor));
                             continue;
                         }
                     }
@@ -69,27 +70,36 @@ impl NormalFormatter {
 
                 if prec == Precedence::Term {
                     format!(" {} {}", if negative_term { "-" } else { "+" }, mul_string)
+                } else if prec == Precedence::Exponent {
+                    format!("({})", mul_string)
                 } else {
                     format!("{}{}", if negative_term { "-" } else { "" }, mul_string)
                 }
             }
             Exponent(base, exp) => {
-                let base_str = Self::format(base);
-                let exp_str = Self::format(exp);
+                let base_str = Self::format_impl(base, Precedence::Exponent);
+                let exp_str = Self::format_impl(exp, Precedence::Exponent);
 
                 let str = base_str + "^" + exp_str.as_str();
                 if prec == Precedence::Term {
                     format!(" + {}", str)
+                } else if prec == Precedence::Exponent {
+                    format!("({})", str)
                 } else {
                     str
                 }
+            }
+            Function(name, argument) => {
+                let argument_str = Self::format(argument);
+
+                format!("{}({})", name, argument_str)
             }
         }
     }
 }
 
 impl ValueFormatter for NormalFormatter {
-    fn format(value: &RuntimeVal) -> String {
+    fn format(value: &RunVal) -> String {
         NormalFormatter::format_impl(value, Precedence::None)
     }
 }

@@ -146,6 +146,8 @@ impl Lexer {
             ':' => TokenType::Colon,
             ';' => TokenType::Semicolon,
 
+            '~' => TokenType::Tilde,
+
             '.' => TokenType::Dot,
             ',' => TokenType::Comma,
 
