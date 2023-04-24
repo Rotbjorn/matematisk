@@ -5,13 +5,13 @@ use matex_common::{
 };
 use matex_compiler::cas::backend::{
     format::{NormalFormatter, ValueFormatter},
-    value::RuntimeVal,
+    value::RunVal,
 };
 
 pub struct Inspector {}
 
 impl Inspector {
-    pub fn ui(ui: &mut Ui, functions: &SymbolTable<Function>, variables: &SymbolTable<RuntimeVal>) {
+    pub fn ui(ui: &mut Ui, functions: &SymbolTable<Function>, variables: &SymbolTable<RunVal>) {
         ui.collapsing(RichText::new("Functions").heading(), |ui| {
             egui::Grid::new("func_grid")
                 .num_columns(1)
