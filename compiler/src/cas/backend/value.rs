@@ -1,15 +1,36 @@
-use std::{cmp::Ordering, collections::VecDeque};
+use std::{cmp::Ordering, collections::VecDeque, fmt::{Debug, Write, self}};
 
 #[cfg(target_arch = "wasm32")]
 use serde::{Deserialize, Serialize};
 
+use log::{debug, error};
 use super::format::ValueFormatter;
 
-#[derive(Clone, Debug, PartialEq)]
-// Better name
+
+macro_rules! value_debug {
+    ($($arg:tt)+) => (debug!(target: "matex::value", $($arg)+));
+}
+
+macro_rules! value_error {
+    ($($arg:tt)+) => (error!(target: "matex::value", $($arg)+));
+}
+
+
+#[derive(Clone, PartialEq)]
 #[cfg_attr(target_arch = "wasm32", derive(Serialize, Deserialize))]
-pub enum RuntimeVal {
+// Better name
+
+pub struct RunVal {
+    pub(crate) simplified: bool,
+    pub typ: RunType,
+}
+
+#[cfg_attr(target_arch = "wasm32", derive(Serialize, Deserialize))]
+#[derive(Clone, PartialEq)]
+pub enum RunType {
+    // Merge these two?
     Unit,
+    Undefined,
 
     // TODO: Add complex, real, etc
     Number(f64),
@@ -19,26 +40,38 @@ pub enum RuntimeVal {
 
     Sum(Terms),
     Product(Factors),
-    Exponent(Box<RuntimeVal>, Box<RuntimeVal>),
+    Exponent(Box<RunVal>, Box<RunVal>),
+
+    Function(String, Box<RunVal>)
 }
 
-#[derive(Clone, Debug, PartialEq)]
-#[cfg_attr(target_arch = "wasm32", derive(Serialize, Deserialize))]
-pub struct Factors(pub VecDeque<RuntimeVal>);
 
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(target_arch = "wasm32", derive(Serialize, Deserialize))]
-pub struct Terms(pub VecDeque<RuntimeVal>);
+pub struct Factors(pub VecDeque<RunVal>);
 
-impl RuntimeVal {
+#[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(target_arch = "wasm32", derive(Serialize, Deserialize))]
+pub struct Terms(pub VecDeque<RunVal>);
+
+impl RunVal {
     pub fn format<T: ValueFormatter>(&self) {
-        T::format(self);
+        T::format(&self);
     }
 
-    pub(crate) fn add(mut self, mut other: RuntimeVal) -> RuntimeVal {
-        use RuntimeVal::*;
-        match (&mut self, &mut other) {
-            (Unit, _) | (_, Unit) => panic!("Unit error when adding"),
+    pub(crate) fn new(typ: RunType) -> Self{
+        Self {
+            simplified: false,
+            typ,
+        }
+    }
+
+    pub(crate) fn add(mut self, mut other: RunVal) -> RunVal {
+        use RunType::*;
+
+        let typ = match (&mut self.typ, &mut other.typ) {
+            (Unit, _) | (_, Unit)
+            | (Undefined, _) | (_, Undefined) => Undefined.into(),
 
             (Bool(_), _) | (_, Bool(_)) => panic!("No addition with booleans"),
 
@@ -46,37 +79,49 @@ impl RuntimeVal {
 
             (Sum(Terms(v)), _) => {
                 v.push_back(other);
-                self
+                self.typ
             }
 
             (_, Sum(Terms(v))) => {
                 v.push_back(self);
-                other
+                other.typ
             }
 
             (Number(_), Symbol(_))
             | (Number(_), Product(_))
             | (Number(_), Exponent(_, _))
+            | (Number(_), Function(_, _))
             | (Symbol(_), Number(_))
             | (Symbol(_), Symbol(_))
             | (Symbol(_), Product(_))
             | (Symbol(_), Exponent(_, _))
+            | (Symbol(_), Function(_, _)) 
             | (Product(_), Number(_))
             | (Product(_), Symbol(_))
             | (Product(_), Product(_))
             | (Product(_), Exponent(_, _))
+            | (Product(_), Function(_, _)) 
             | (Exponent(_, _), Number(_))
             | (Exponent(_, _), Symbol(_))
             | (Exponent(_, _), Product(_))
-            | (Exponent(_, _), Exponent(_, _)) => {
-                RuntimeVal::Sum(Terms(VecDeque::from([self, other])))
+            | (Exponent(_, _), Exponent(_, _))
+            | (Exponent(_, _), Function(_, _)) 
+            | (Function(_, _), Number(_)) 
+            | (Function(_, _), Symbol(_)) 
+            | (Function(_, _), Product(_))
+            | (Function(_, _), Exponent(_, _))
+            | (Function(_, _), Function(_, _)) => {
+                RunType::Sum(Terms(VecDeque::from([self, other])))
             }
-        }
+        };
+
+         RunVal::new(typ)
     }
-    pub(crate) fn multiply(mut self, mut other: RuntimeVal) -> RuntimeVal {
-        use RuntimeVal::*;
-        match (&mut self, &mut other) {
-            (Unit, _) | (_, Unit) => panic!("Unit error when multiplicating"),
+    pub(crate) fn multiply(mut self, mut other: RunVal) -> RunVal {
+        use RunType::*;
+        let typ = match (&mut self.typ, &mut other.typ) {
+            (Unit, _) | (_, Unit) 
+            | (Undefined, _) | (_, Undefined)=> Undefined,
 
             (Bool(_), _) | (_, Bool(_)) => panic!("No multiplication with booleans"),
 
@@ -84,98 +129,121 @@ impl RuntimeVal {
 
             (Product(Factors(v)), _) => {
                 v.push_back(other);
-                self
+                self.typ
             }
 
             (_, Product(Factors(v))) => {
                 v.push_back(self);
-                other
+                other.typ
             }
 
             (Number(_), Symbol(_))
             | (Number(_), Sum(_))
             | (Number(_), Exponent(_, _))
+            | (Number(_), Function(_, _))
             | (Symbol(_), Number(_))
             | (Symbol(_), Symbol(_))
             | (Symbol(_), Sum(_))
             | (Symbol(_), Exponent(_, _))
+            | (Symbol(_), Function(_, _))
             | (Sum(_), Number(_))
             | (Sum(_), Symbol(_))
             | (Sum(_), Sum(_))
             | (Sum(_), Exponent(_, _))
+            | (Sum(_), Function(_, _)) 
             | (Exponent(_, _), Number(_))
             | (Exponent(_, _), Symbol(_))
             | (Exponent(_, _), Sum(_))
-            | (Exponent(_, _), Exponent(_, _)) => {
-                RuntimeVal::Product(Factors(VecDeque::from([self, other])))
+            | (Exponent(_, _), Exponent(_, _))
+            | (Exponent(_, _), Function(_, _))
+            | (Function(_, _), Number(_))
+            | (Function(_, _), Symbol(_))
+            | (Function(_, _), Sum(_))
+            | (Function(_, _), Exponent(_, _))
+            | (Function(_, _), Function(_, _)) => {
+                RunType::Product(Factors(VecDeque::from([self, other])))
             }
-        }
+        };
+
+        RunVal::new(typ)
     }
-    pub(crate) fn power(self, other: RuntimeVal) -> RuntimeVal {
-        use RuntimeVal::*;
-        match (&self, &other) {
-            (Unit, _) | (_, Unit) => panic!("Unit error when powering"),
+    pub(crate) fn power(self, other: RunVal) -> RunVal {
+        use RunType::*;
+        match (&self.typ, &other.typ) {
+            (Unit, _) | (_, Unit)
+            | (Undefined, _) | (_, Undefined) => Undefined.into(),
 
             (Bool(_), _) | (_, Bool(_)) => panic!("No powering with booleans"),
 
-            (Number(lhs), Number(rhs)) => Number(lhs.powf(*rhs)),
+            (Number(lhs), Number(rhs)) => Number(lhs.powf(*rhs)).into(),
 
             (Number(_), Symbol(_))
             | (Number(_), Sum(_))
             | (Number(_), Product(_))
             | (Number(_), Exponent(_, _))
+            | (Number(_), Function(_, _)) 
             | (Symbol(_), Number(_))
             | (Symbol(_), Symbol(_))
             | (Symbol(_), Sum(_))
             | (Symbol(_), Product(_))
             | (Symbol(_), Exponent(_, _))
+            | (Symbol(_), Function(_, _)) => todo!(),
             | (Sum(_), Number(_))
             | (Sum(_), Symbol(_))
             | (Sum(_), Sum(_))
             | (Sum(_), Product(_))
             | (Sum(_), Exponent(_, _))
+            | (Sum(_), Function(_, _)) 
             | (Product(_), Number(_))
             | (Product(_), Symbol(_))
             | (Product(_), Sum(_))
             | (Product(_), Product(_))
             | (Product(_), Exponent(_, _))
+            | (Product(_), Function(_, _)) 
             | (Exponent(_, _), Number(_))
             | (Exponent(_, _), Symbol(_))
             | (Exponent(_, _), Sum(_))
             | (Exponent(_, _), Product(_))
-            | (Exponent(_, _), Exponent(_, _)) => Exponent(Box::new(self), Box::new(other)),
+            | (Exponent(_, _), Exponent(_, _))
+            | (Exponent(_, _), Function(_, _)) 
+            | (Function(_, _), Number(_)) 
+            | (Function(_, _), Symbol(_)) 
+            | (Function(_, _), Sum(_)) 
+            | (Function(_, _), Product(_)) 
+            | (Function(_, _), Exponent(_, _)) 
+            | (Function(_, _), Function(_, _)) => Exponent(Box::new(self), Box::new(other)).into()
         }
     }
-    pub(crate) fn less(self, other: RuntimeVal) -> RuntimeVal {
-        match (&self, &other) {
-            (RuntimeVal::Number(lhs), RuntimeVal::Number(rhs)) => RuntimeVal::Bool(lhs < rhs),
+    pub(crate) fn less(self, other: RunVal) -> RunVal {
+        match (&self.typ, &other.typ) {
+            (RunType::Number(lhs), RunType::Number(rhs)) => RunType::Bool(lhs < rhs).into(),
 
             _ => {
                 todo!("Not implemented: {:?} {:?}", self, other);
             }
         }
     }
-    pub(crate) fn less_equal(self, other: RuntimeVal) -> RuntimeVal {
-        match (&self, &other) {
-            (RuntimeVal::Number(lhs), RuntimeVal::Number(rhs)) => RuntimeVal::Bool(lhs <= rhs),
+    pub(crate) fn less_equal(self, other: RunVal) -> RunVal {
+        match (&self.typ, &other.typ) {
+            (RunType::Number(lhs), RunType::Number(rhs)) => RunType::Bool(lhs <= rhs).into(),
 
             _ => {
                 todo!("Not implemented: {:?} {:?}", self, other);
             }
         }
     }
-    pub(crate) fn greater(self, other: RuntimeVal) -> RuntimeVal {
-        match (&self, &other) {
-            (RuntimeVal::Number(lhs), RuntimeVal::Number(rhs)) => RuntimeVal::Bool(lhs > rhs),
+    pub(crate) fn greater(self, other: RunVal) -> RunVal {
+        match (&self.typ, &other.typ) {
+            (RunType::Number(lhs), RunType::Number(rhs)) => RunType::Bool(lhs > rhs).into(),
 
             _ => {
                 todo!("Not implemented: {:?} {:?}", self, other);
             }
         }
     }
-    pub(crate) fn greater_equal(self, other: RuntimeVal) -> RuntimeVal {
-        match (&self, &other) {
-            (RuntimeVal::Number(lhs), RuntimeVal::Number(rhs)) => RuntimeVal::Bool(lhs >= rhs),
+    pub(crate) fn greater_equal(self, other: RunVal) -> RunVal {
+        match (&self.typ, &other.typ) {
+            (RunType::Number(lhs), RunType::Number(rhs)) => RunType::Bool(lhs >= rhs).into(),
 
             _ => {
                 todo!("Not implemented: {:?} {:?}", self, other);
@@ -184,41 +252,76 @@ impl RuntimeVal {
     }
 }
 
-impl RuntimeVal {
+impl RunVal {
     pub(crate) fn simplify(&mut self) {
-        use RuntimeVal::*;
-        match self {
+        value_debug!("simplify");
+        use RunType::*;
+
+        if self.simplified {
+            self.flatten();
+            value_debug!("skipping simplification; already simplified!");
+            return;
+        }
+
+        match &mut self.typ {
             Sum(terms) => {
-                RuntimeVal::combine_like_terms(terms);
-                dbg!(&terms);
-                RuntimeVal::combine_integers(terms);
-                dbg!(&terms);
-                RuntimeVal::rearrange(terms);
-                dbg!(&terms);
+                value_debug!("simplify sum: {:?}", terms);
+                value_debug!("recursive simplify factors");
+                for term in &mut terms.0 {
+                    term.simplify();
+                }
+
+                RunVal::combine_like_terms(terms);
+
+                RunVal::combine_integers(terms);
+
+                RunVal::rearrange(terms);
+
             }
             Product(factors) => {
-                let coeff = RuntimeVal::extract_coefficient(factors);
+                value_debug!("simplify product: {:?}", factors);
+
+                value_debug!("recursive simplify factors");
+                for factor in &mut factors.0 {
+                    factor.simplify();
+                }
+
+                RunVal::combine_like_factors(factors);
+
+                let coeff = RunVal::extract_coefficient(factors);
 
                 let Factors(factors) = factors;
 
                 if coeff != 1.0 {
-                    factors.push_front(coeff.into());
+                    factors.push_front(Number(coeff).into());
                 }
+            }
+            Exponent(base, exp) => {
+                base.simplify();
+                exp.simplify();
             }
             _ => {}
         }
         self.flatten();
+        self.simplified = true;
         dbg!(&self);
     }
 
     pub(crate) fn combine_like_terms(terms: &mut Terms) {
+        value_debug!("combining like terms");
+        use RunType::*;
         // Extract the coefficients from each term
-        let mut term_coefficients = RuntimeVal::extract_coefficients(terms);
+        if terms.0.len() <= 1 {
+            value_debug!("returning; only one item, nothing to combine.");
+            return;
+        }
+        
+        let mut term_coefficients = RunVal::extract_coefficients(terms);
 
         dbg!(&term_coefficients);
         dbg!(&terms);
 
-        let mut new_terms: VecDeque<RuntimeVal> = VecDeque::new();
+        let mut new_terms: VecDeque<RunVal> = VecDeque::new();
 
         while let Some((co_eff, term)) = term_coefficients.pop() {
             let mut coefficient_total = co_eff;
@@ -237,16 +340,14 @@ impl RuntimeVal {
 
             if coefficient_total == 1.0 {
                 new_terms.push_front(term);
-            } else if coefficient_total == 0.0 {
-                new_terms.push_back(RuntimeVal::Number(0.0));
-            } else {
+            } else if coefficient_total != 0.0 {
                 let term =
-                    RuntimeVal::Product(Factors(VecDeque::from([coefficient_total.into(), term])));
+                    RunType::Product(Factors(VecDeque::from([Number(coefficient_total).into(), term.into()])));
 
                 if coefficient_total.is_sign_positive() {
-                    new_terms.push_front(term);
+                    new_terms.push_front(term.into());
                 } else {
-                    new_terms.push_back(term);
+                    new_terms.push_back(term.into());
                 }
             }
             dbg!(&new_terms);
@@ -254,12 +355,75 @@ impl RuntimeVal {
         *terms = Terms(new_terms);
     }
 
+    pub(crate) fn combine_like_factors(factors: &mut Factors) {
+        value_debug!("combining like factors");
+        let factors_vec = &mut factors.0;
+        let mut new_factors: VecDeque<RunVal> = VecDeque::new();
+
+        while let Some(factor) = factors_vec.pop_back() {
+
+            let mut exponents: VecDeque<RunVal> = VecDeque::new();
+
+            let mut found = false;
+
+            let base = if let RunType::Exponent(base, exp) = factor.typ {
+                exponents.push_back(*exp);
+                *base
+            } else {
+                exponents.push_back(RunType::Number(1.0).into());
+                factor
+            };
+
+            let mut i = 0;
+            while i < factors_vec.len() {
+                let other_factor = &factors_vec[i];                
+
+                if base.struct_equal(other_factor) {
+                    found = true;
+                    exponents.push_back(RunType::Number(1.0).into());
+                    factors_vec.remove(i);
+                    continue
+                } else if let RunType::Exponent(other_base, other_exp) = &other_factor.typ {
+                    if base.struct_equal(other_base) {
+                        found = true;
+                        exponents.push_back(*other_exp.clone());
+                        factors_vec.remove(i);
+                        continue
+                    }
+                }
+                i += 1;
+            }
+
+            if found {
+                let mut exponents = RunVal::new(RunType::Sum(Terms(exponents)));
+                println!("_------------------------------");
+                println!("_------------------------------");
+                println!("_------------------------------");
+                dbg!(&exponents);
+                exponents.simplify();
+                dbg!(&exponents);
+                println!("_------------------------------");
+                println!("_------------------------------");
+                println!("_------------------------------");
+                println!("_------------------------------");
+                println!("_------------------------------");
+                println!("_------------------------------");
+                println!("_------------------------------");
+                let exponent = RunType::Exponent(Box::new(base), Box::new(exponents));
+                new_factors.push_back(exponent.into());
+            } else {
+                new_factors.push_back(base.into()); 
+            }
+        }
+        *factors_vec = new_factors;
+    }
+
     pub(crate) fn combine_integers(Terms(terms): &mut Terms) {
         let mut total = 0.0;
 
         let mut i = 0;
         while i < terms.len() {
-            if let RuntimeVal::Number(n) = terms[i] {
+            if let RunType::Number(n) = terms[i].typ {
                 total += n;
                 terms.remove(i);
             } else {
@@ -272,26 +436,26 @@ impl RuntimeVal {
             // If there are no terms left, then add the zero as the only term.
         }
 
-        let constant = RuntimeVal::Number(total);
+        let constant = RunType::Number(total);
 
-        terms.push_back(constant);
+        terms.push_back(constant.into());
     }
 
     pub(crate) fn rearrange(Terms(terms): &mut Terms) {
-        use RuntimeVal::*;
+        use RunType::*;
         let terms = terms.make_contiguous();
         terms.sort_by(|a, b| {
             dbg!(&a);
             dbg!(&b);
-            match (a, b) {
+            match (&a.typ, &b.typ) {
                 (_, Product(factors)) => {
-                    return if RuntimeVal::product_is_negative(factors) {
+                    return if RunVal::product_is_negative(factors) {
                         Ordering::Less
                     } else {
                         Ordering::Greater
                     }
                 }
-                (Product(factors), _) if RuntimeVal::product_is_negative(factors) => {
+                (Product(factors), _) if RunVal::product_is_negative(factors) => {
                     Ordering::Greater
                 }
                 (_, _) => Ordering::Less,
@@ -301,9 +465,11 @@ impl RuntimeVal {
     }
 
     pub(crate) fn flatten(&mut self) {
-        use RuntimeVal::*;
-        match self {
-            Sum(Terms(v)) | Product(Factors(v)) if v.len() == 1 => {
+        use RunType::*;
+        match &mut self.typ {
+            Sum(Terms(v)) 
+            | Product(Factors(v)) 
+            if v.len() == 1 => {
                 let value = &mut v[0];
                 value.flatten();
                 *self = value.clone();
@@ -312,9 +478,9 @@ impl RuntimeVal {
         }
     }
 
-    pub(crate) fn struct_equal(&self, other: &RuntimeVal) -> bool {
-        match (self, other) {
-            (RuntimeVal::Sum(Terms(terms)), RuntimeVal::Sum(Terms(other))) => {
+    pub(crate) fn struct_equal(&self, other: &RunVal) -> bool {
+        match (&self.typ, &other.typ) {
+            (RunType::Sum(Terms(terms)), RunType::Sum(Terms(other))) => {
                 if terms.len() != other.len() {
                     return false;
                 }
@@ -335,7 +501,7 @@ impl RuntimeVal {
 
                 true
             }
-            (RuntimeVal::Product(Factors(factors)), RuntimeVal::Product(Factors(other))) => {
+            (RunType::Product(Factors(factors)), RunType::Product(Factors(other))) => {
                 if factors.len() != other.len() {
                     return false;
                 }
@@ -357,23 +523,23 @@ impl RuntimeVal {
 
                 true
             }
-            (RuntimeVal::Exponent(base, exp), RuntimeVal::Exponent(other_base, other_exp)) => {
-                base.struct_equal(other_base) && exp.struct_equal(other_exp)
+            (RunType::Exponent(base, exp), RunType::Exponent(other_base, other_exp)) => {
+                base.struct_equal(&other_base) && exp.struct_equal(&other_exp)
             }
-            (RuntimeVal::Number(num), RuntimeVal::Number(other)) => num == other,
-            (RuntimeVal::Symbol(symbol), RuntimeVal::Symbol(other)) => symbol == other,
+            (RunType::Number(num), RunType::Number(other)) => num == other,
+            (RunType::Symbol(symbol), RunType::Symbol(other)) => symbol == other,
             _ => false,
         }
     }
 
-    pub(crate) fn extract_coefficients(Terms(terms): &mut Terms) -> Vec<(f64, RuntimeVal)> {
-        let mut term_coefficients: Vec<(f64, RuntimeVal)> = Vec::new();
+    pub(crate) fn extract_coefficients(Terms(terms): &mut Terms) -> Vec<(f64, RunVal)> {
+        let mut term_coefficients: Vec<(f64, RunVal)> = Vec::new();
 
         for term in terms {
             dbg!(&term);
 
-            let coeff = if let RuntimeVal::Product(ref mut factors) = term {
-                RuntimeVal::extract_coefficient(factors)
+            let coeff = if let RunType::Product(ref mut factors) = term.typ {
+                RunVal::extract_coefficient(factors)
             } else {
                 1.0
             };
@@ -386,6 +552,7 @@ impl RuntimeVal {
     }
 
     pub(crate) fn extract_coefficient(Factors(factors): &mut Factors) -> f64 {
+        value_debug!("extracting coefficient of: {:?}", factors);
         let mut index = 0;
         let mut coeff = 1.0;
 
@@ -394,7 +561,7 @@ impl RuntimeVal {
 
             dbg!(&factor);
 
-            if let RuntimeVal::Number(n) = factor {
+            if let RunType::Number(n) = &factor.typ {
                 coeff *= *n;
                 dbg!(&coeff);
                 dbg!(&factor);
@@ -403,32 +570,104 @@ impl RuntimeVal {
                 index += 1;
             }
         }
-        dbg!(&coeff);
+        value_debug!("extracted coefficient: {}", coeff);
         coeff
     }
 
     pub(crate) fn product_is_negative(Factors(factors): &Factors) -> bool {
-        use RuntimeVal::*;
+        value_debug!("is product negative?");
+        use RunType::*;
 
-        factors.iter().fold(false, |is_negative, factor| {
-            if let Number(n) = factor {
+        let is_negative = factors.iter().fold(false, |is_negative, factor| {
+            if let Number(n) = factor.typ {
                 if n.is_sign_negative() {
                     return !is_negative;
                 }
             }
             is_negative
-        })
+        });
+
+        value_debug!("is negative: {}", is_negative);
+        
+        is_negative
     }
 }
 
-impl From<String> for RuntimeVal {
+impl fmt::Debug for RunVal {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self.typ {
+            RunType::Unit 
+            | RunType::Undefined 
+            | RunType::Number(_) 
+            | RunType::Symbol(_) 
+            | RunType::Bool(_) 
+            | RunType::Function(_, _) => write!(f, "{:?}", self.typ),
+            _ => {
+                write!(f, "({}{:?})", if self.simplified { "" } else { "!" }, self.typ)
+            }
+        }
+    }
+}
+
+impl From<RunType> for RunVal {
+    fn from(value: RunType) -> Self {
+        Self::new(value)
+    }
+}
+
+impl fmt::Debug for RunType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            RunType::Unit => todo!(),
+            RunType::Undefined => todo!(),
+            RunType::Number(n) => write!(f, "{}", n),
+            RunType::Symbol(s) => write!(f, "'{}'", s),
+            RunType::Bool(_) => todo!(),
+            RunType::Sum(Terms(terms)) => {
+                write!(f, "(+, ")?;
+                let mut vec = Vec::<String>::new();
+
+                for term in terms {
+                    vec.push(format!("{:?}", term));
+                }
+
+                let str = vec.join(", ");
+                f.write_str(&str)?;
+
+                write!(f, ")")
+            },
+
+            RunType::Product(Factors(factors)) => {
+                write!(f, "(*, ")?;
+                let mut vec = Vec::<String>::new();
+
+                for factor in factors {
+                    vec.push(format!("{:?}", factor));
+                }
+
+                let str = vec.join(", ");
+                f.write_str(&str)?;
+
+                write!(f, ")")
+            },
+
+            RunType::Exponent(base, exp) => {
+                write!(f, "(^, ({:?}), ({:?}))", base, exp)
+            },
+
+            RunType::Function(_, _) => todo!(),
+        }
+    }
+}
+
+impl From<String> for RunType {
     fn from(val: String) -> Self {
-        RuntimeVal::Symbol(val)
+        RunType::Symbol(val)
     }
 }
 
-impl From<f64> for RuntimeVal {
+impl From<f64> for RunType {
     fn from(value: f64) -> Self {
-        RuntimeVal::Number(value)
+        RunType::Number(value)
     }
 }

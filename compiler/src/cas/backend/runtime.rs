@@ -6,7 +6,7 @@ use matex_common::node::Visitor;
 use log::{debug, error};
 
 use super::environment::{Environment, Scope};
-use super::value::RuntimeVal;
+use super::value::{RunType, RunVal};
 
 macro_rules! runtime_debug {
     ($($arg:tt)+) => (debug!(target: "matex::runtime", $($arg)+));
@@ -20,7 +20,7 @@ pub struct Runtime {
 }
 
 impl Runtime {
-    pub fn run(&mut self, program: &Program) -> RuntimeVal {
+    pub fn run(&mut self, program: &Program) -> RunVal {
         self.visit_program(program)
     }
 
@@ -34,8 +34,8 @@ impl Runtime {
 }
 
 impl Runtime {
-    fn visit_program(&mut self, Program(statements): &Program) -> RuntimeVal {
-        let mut value = RuntimeVal::Number(-1.0);
+    fn visit_program(&mut self, Program(statements): &Program) -> RunVal {
+        let mut value = RunType::Number(-1.0).into();
         for statement in statements {
             value = self.visit_statement(statement);
         }
@@ -48,7 +48,7 @@ impl Runtime {
         func_name: &str,
         params: &Vec<Parameter>,
         function_body: &Expr,
-    ) -> RuntimeVal {
+    ) -> RunVal {
         runtime_debug!("Visit function declaration");
         runtime_debug!("func_name: {}", func_name);
         runtime_debug!("params: {:?}", params);
@@ -59,31 +59,42 @@ impl Runtime {
             params: params.clone(),
             body: function_body.clone(),
         };
+
         self.environment
             .get_scope()
             .functions
             .insert(func_name.to_owned(), function);
-        RuntimeVal::Unit
+
+        RunType::Unit.into()
     }
 
-    fn visit_variable(&mut self, name: &String) -> RuntimeVal {
+    fn visit_unset_variable(&mut self, name: &String) -> RunVal {
+        runtime_debug!("Visit unset variable");
+        runtime_debug!("name: {}", name);
+
+        self.environment.get_scope().variables.remove(name);
+
+        RunType::Unit.into()
+    }
+
+    fn visit_variable(&mut self, name: &String) -> RunVal {
         runtime_debug!("Visit variable");
         runtime_debug!("name: {}", name);
 
         if let Some(variable) = self.environment.get_scope().variables.get(name) {
             variable.clone()
         } else {
-            RuntimeVal::Symbol(name.clone())
+            RunType::Symbol(name.clone()).into()
         }
     }
 
-    fn visit_unary_operation(&mut self, expr: &Expr) -> RuntimeVal {
+    fn visit_unary_operation(&mut self, expr: &Expr) -> RunVal {
         runtime_debug!("Visit unary operation");
         runtime_debug!("expr: {:?}", expr);
 
         let expr = self.visit_expr(expr);
 
-        let value = expr.multiply(RuntimeVal::Number(-1.0));
+        let value = expr.multiply(RunType::Number(-1.0).into());
 
         value
     }
@@ -93,7 +104,7 @@ impl Runtime {
         left: &Expr,
         operation: &BinOp,
         right: &Expr,
-    ) -> RuntimeVal {
+    ) -> RunVal {
         runtime_debug!("Visit binary operation");
         runtime_debug!("left: {:?}", left);
         runtime_debug!("operation: {:?}", operation);
@@ -105,12 +116,12 @@ impl Runtime {
         let value = match *operation {
             BinOp::Add => lhs.add(rhs),
             BinOp::Subtract => {
-                let rhs = rhs.multiply(RuntimeVal::Number(-1.0));
+                let rhs = rhs.multiply(RunType::Number(-1.0).into());
                 lhs.add(rhs)
             }
             BinOp::Multiply => lhs.multiply(rhs),
             BinOp::Divide => {
-                let rhs = rhs.power(RuntimeVal::Number(-1.0));
+                let rhs = rhs.power(RunType::Number(-1.0).into());
                 lhs.multiply(rhs)
             }
             BinOp::Power => lhs.power(rhs),
@@ -131,7 +142,7 @@ impl Runtime {
         value
     }
 
-    fn visit_assignment(&mut self, holder: &Expr, value: &Expr) -> RuntimeVal {
+    fn visit_assignment(&mut self, holder: &Expr, value: &Expr) -> RunVal {
         runtime_debug!("Visit assignment");
         runtime_debug!("holder: {:?}", holder);
         runtime_debug!("value: {:?}", value);
@@ -152,7 +163,7 @@ impl Runtime {
         value
     }
 
-    fn visit_if(&mut self, condition: &Expr, body: &Expr, else_body: &Expr) -> RuntimeVal {
+    fn visit_if(&mut self, condition: &Expr, body: &Expr, else_body: &Expr) -> RunVal {
         runtime_debug!("Visit if");
         runtime_debug!("condition: {:?}", condition);
         runtime_debug!("body: {:?}", body);
@@ -160,9 +171,9 @@ impl Runtime {
 
         let condition = self.visit_expr(condition);
 
-        let RuntimeVal::Bool(b) = condition else {
+        let RunType::Bool(b) = condition.typ else {
             eprintln!("Expected a boolean value, got {:?}", condition);
-            return RuntimeVal::Unit
+            return RunType::Unit.into()
         };
 
         let value = if b {
@@ -174,13 +185,13 @@ impl Runtime {
         value
     }
 
-    fn visit_function_call(&mut self, name: &String, arguments: &Vec<Expr>) -> RuntimeVal {
+    fn visit_function_call(&mut self, name: &String, arguments: &Vec<Expr>) -> RunVal {
         runtime_debug!("Visit function call");
         runtime_debug!("func_name: {}", name);
         runtime_debug!("func_args: {:?}", arguments);
 
         let Some(Function { name: _, params, body }) = self.environment.get_scope().functions.get(name).cloned() else {
-            return RuntimeVal::Unit;
+            return RunType::Unit.into();
         };
 
         let mut new_scope = Scope::default();
@@ -204,23 +215,25 @@ impl Runtime {
     }
 }
 
-impl Visitor<RuntimeVal> for Runtime {
+impl Visitor<RunVal> for Runtime {
     // TODO: Take ownership instead, since statements are never visited twice
     // Make sure Program is its own type, and not a statement.
-    fn visit_statement(&mut self, statement: &Statement) -> RuntimeVal {
+    fn visit_statement(&mut self, statement: &Statement) -> RunVal {
+        use Statement::*;
         match statement {
-            Statement::FunctionDefinition(Function {
+            FunctionDefinition(Function {
                 name,
                 params,
                 body: function_body,
             }) => self.visit_function(name, params, function_body),
-            Statement::Expression(expr) => self.visit_expr(expr),
+            UnsetVariable(symbol) => self.visit_unset_variable(symbol),
+            Expression(expr) => self.visit_expr(expr),
         }
     }
 
-    fn visit_expr(&mut self, expr: &Expr) -> RuntimeVal {
+    fn visit_expr(&mut self, expr: &Expr) -> RunVal {
         match expr {
-            Expr::Number(n) => RuntimeVal::Number(*n),
+            Expr::Number(n) => RunType::Number(*n).into(),
             Expr::Variable(name) => self.visit_variable(name),
             Expr::List(_) => todo!("Not handling List"),
             Expr::Unary(expr) => self.visit_unary_operation(expr),

@@ -1,6 +1,7 @@
 use matex_common::{function::Function, util::SymbolTable};
 
-use super::value::RuntimeVal;
+use super::value::RunVal;
+
 
 #[derive(Default, Debug)]
 pub struct Environment {
@@ -26,5 +27,5 @@ impl Environment {
 #[derive(Default, Debug)]
 pub struct Scope {
     pub functions: SymbolTable<Function>,
-    pub variables: SymbolTable<RuntimeVal>,
+    pub variables: SymbolTable<RunVal>,
 }
