@@ -46,6 +46,8 @@ pub enum TokenType {
     Colon,
     Semicolon,
 
+    Tilde,
+
     Dot,
     Comma,
 

@@ -10,6 +10,7 @@ pub struct Program(pub Statements);
 #[derive(Debug)]
 pub enum Statement {
     FunctionDefinition(Function),
+    UnsetVariable(String),
     Expression(Expr),
 }
 
@@ -181,6 +182,9 @@ impl<'a, W: Write> Visitor<Result<u32, Error>> for ASTGraphGenerator<'a, W> {
                 let body = self.visit_expr(body)?;
 
                 self.create_edge(current, body)?;
+            }
+            Statement::UnsetVariable(symbol) => {
+                self.create_node(&format!("unset: {}", symbol))?;
             }
             Statement::Expression(expr) => {
                 self.visit_expr(expr)?;
