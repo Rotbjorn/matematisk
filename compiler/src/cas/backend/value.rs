@@ -1,4 +1,4 @@
-use std::{cmp::Ordering, collections::VecDeque, fmt::{Debug, self}};
+use std::{cmp::Ordering, fmt::{Debug, self}};
 
 #[cfg(target_arch = "wasm32")]
 use serde::{Deserialize, Serialize};
@@ -10,6 +10,7 @@ macro_rules! value_debug {
     ($($arg:tt)+) => (debug!(target: "matex::value", $($arg)+));
 }
 
+#[allow(unused_macros)]
 macro_rules! value_error {
     ($($arg:tt)+) => (error!(target: "matex::value", $($arg)+));
 }
@@ -29,6 +30,7 @@ pub struct RunVal {
 pub enum RunType {
     // Merge these two?
     Unit,
+
     Undefined,
 
     // TODO: Add complex, real, etc
@@ -47,11 +49,11 @@ pub enum RunType {
 
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(target_arch = "wasm32", derive(Serialize, Deserialize))]
-pub struct Factors(pub VecDeque<RunVal>);
+pub struct Factors(pub Vec<RunVal>);
 
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(target_arch = "wasm32", derive(Serialize, Deserialize))]
-pub struct Terms(pub VecDeque<RunVal>);
+pub struct Terms(pub Vec<RunVal>);
 
 impl RunVal {
     pub fn format<T: ValueFormatter>(&self) {
@@ -66,6 +68,7 @@ impl RunVal {
     }
 
     pub(crate) fn add(mut self, mut other: RunVal) -> RunVal {
+        value_debug!("add: {:?} + {:?}", self, other);
         use RunType::*;
 
         let typ = match (&mut self.typ, &mut other.typ) {
@@ -77,12 +80,12 @@ impl RunVal {
             (Number(lhs), Number(rhs)) => Number(*lhs + *rhs),
 
             (Sum(Terms(v)), _) => {
-                v.push_back(other);
+                v.push(other);
                 self.typ
             }
 
             (_, Sum(Terms(v))) => {
-                v.push_back(self);
+                v.push(self);
                 other.typ
             }
 
@@ -110,13 +113,14 @@ impl RunVal {
             | (Function(_, _), Product(_))
             | (Function(_, _), Exponent(_, _))
             | (Function(_, _), Function(_, _)) => {
-                RunType::Sum(Terms(VecDeque::from([self, other])))
+                RunType::Sum(Terms(Vec::from([self, other])))
             }
         };
 
          RunVal::new(typ)
     }
     pub(crate) fn multiply(mut self, mut other: RunVal) -> RunVal {
+        value_debug!("multiply: {:?} * {:?}", self, other);
         use RunType::*;
         let typ = match (&mut self.typ, &mut other.typ) {
             (Unit, _) | (_, Unit) 
@@ -127,12 +131,12 @@ impl RunVal {
             (Number(lhs), Number(rhs)) => Number(*lhs * *rhs),
 
             (Product(Factors(v)), _) => {
-                v.push_back(other);
+                v.push(other);
                 self.typ
             }
 
             (_, Product(Factors(v))) => {
-                v.push_back(self);
+                v.push(self);
                 other.typ
             }
 
@@ -160,13 +164,14 @@ impl RunVal {
             | (Function(_, _), Sum(_))
             | (Function(_, _), Exponent(_, _))
             | (Function(_, _), Function(_, _)) => {
-                RunType::Product(Factors(VecDeque::from([self, other])))
+                RunType::Product(Factors(Vec::from([self, other])))
             }
         };
 
         RunVal::new(typ)
     }
     pub(crate) fn power(self, other: RunVal) -> RunVal {
+        value_debug!("power: {:?} ^ {:?}", self, other);
         use RunType::*;
         match (&self.typ, &other.typ) {
             (Unit, _) | (_, Unit)
@@ -174,8 +179,9 @@ impl RunVal {
 
             (Bool(_), _) | (_, Bool(_)) => panic!("No powering with booleans"),
 
-            (Number(lhs), Number(rhs)) => Number(lhs.powf(*rhs)).into(),
-
+            // TODO: Calculate directly or keep as exponent?
+            (Number(_lhs), Number(_rhs)) //=> Number(lhs.powf(*rhs)).into(),
+                                                     => Exponent(Box::new(self), Box::new(other)).into(),
             (Number(_), Symbol(_))
             | (Number(_), Sum(_))
             | (Number(_), Product(_))
@@ -286,14 +292,14 @@ impl RunVal {
                 }
 
                 let coeff = RunVal::extract_coefficient(factors);
-                
+
                 RunVal::combine_like_factors(factors);
 
 
                 let Factors(factors) = factors;
 
                 if coeff != 1.0 {
-                    factors.push_front(Number(coeff).into());
+                    factors.push(Number(coeff).into());
                 }
             }
             Exponent(base, exp) => {
@@ -321,7 +327,7 @@ impl RunVal {
         value_debug!("term_coefficients: {:?}", term_coefficients);
         value_debug!("terms: {:?}", terms);
 
-        let mut new_terms: VecDeque<RunVal> = VecDeque::new();
+        let mut new_terms: Vec<RunVal> = Vec::new();
 
         while let Some((co_eff, term)) = term_coefficients.pop() {
             let mut coefficient_total = co_eff;
@@ -339,17 +345,17 @@ impl RunVal {
             }
 
             if coefficient_total == 1.0 {
-                new_terms.push_front(term);
+                new_terms.push(term);
             } else if coefficient_total != 0.0 {
                 let mut term: RunVal =
-                    RunType::Product(Factors(VecDeque::from([Number(coefficient_total).into(), term]))).into();
+                    RunType::Product(Factors(Vec::from([Number(coefficient_total).into(), term]))).into();
                     
                 term.simplify();                
 
                 if coefficient_total.is_sign_positive() {
-                    new_terms.push_front(term);
+                    new_terms.push(term);
                 } else {
-                    new_terms.push_back(term);
+                    new_terms.push(term);
                 }
             }
             dbg!(&new_terms);
@@ -360,19 +366,19 @@ impl RunVal {
     pub(crate) fn combine_like_factors(factors: &mut Factors) {
         value_debug!("combining like factors");
         let factors_vec = &mut factors.0;
-        let mut new_factors: VecDeque<RunVal> = VecDeque::new();
+        let mut new_factors: Vec<RunVal> = Vec::new();
 
-        while let Some(factor) = factors_vec.pop_back() {
+        while let Some(factor) = factors_vec.pop() {
 
-            let mut exponents: VecDeque<RunVal> = VecDeque::new();
+            let mut exponents: Vec<RunVal> = Vec::new();
 
             let mut found = false;
 
             let base = if let RunType::Exponent(base, exp) = factor.typ {
-                exponents.push_back(*exp);
+                exponents.push(*exp);
                 *base
             } else {
-                exponents.push_back(RunType::Number(1.0).into());
+                exponents.push(RunType::Number(1.0).into());
                 factor
             };
 
@@ -382,13 +388,13 @@ impl RunVal {
 
                 if base.struct_equal(other_factor) {
                     found = true;
-                    exponents.push_back(RunType::Number(1.0).into());
+                    exponents.push(RunType::Number(1.0).into());
                     factors_vec.remove(i);
                     continue
                 } else if let RunType::Exponent(other_base, other_exp) = &other_factor.typ {
                     if base.struct_equal(other_base) {
                         found = true;
-                        exponents.push_back(*other_exp.clone());
+                        exponents.push(*other_exp.clone());
                         factors_vec.remove(i);
                         continue
                     }
@@ -402,9 +408,9 @@ impl RunVal {
                 exponents.simplify();
                 value_debug!("exponents after simplification: {:?}", &exponents);
                 let exponent = RunType::Exponent(Box::new(base), Box::new(exponents));
-                new_factors.push_back(exponent.into());
+                new_factors.push(exponent.into());
             } else {
-                new_factors.push_back(base.into()); 
+                new_factors.push(base.into()); 
             }
         }
         *factors_vec = new_factors;
@@ -430,12 +436,12 @@ impl RunVal {
 
         let constant = RunType::Number(total);
 
-        terms.push_back(constant.into());
+        terms.push(constant.into());
     }
 
+    #[allow(dead_code)]
     pub(crate) fn rearrange(Terms(terms): &mut Terms) {
         use RunType::*;
-        let terms = terms.make_contiguous();
         terms.sort_by(|a, b| {
             dbg!(&a);
             dbg!(&b);
@@ -568,6 +574,7 @@ impl RunVal {
         coeff
     }
 
+    #[allow(dead_code)]
     pub(crate) fn product_is_negative(Factors(factors): &Factors) -> bool {
         value_debug!("is product negative?");
         use RunType::*;
