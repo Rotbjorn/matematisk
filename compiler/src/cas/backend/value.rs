@@ -6,7 +6,6 @@ use serde::{Deserialize, Serialize};
 use log::{debug};
 use super::format::ValueFormatter;
 
-
 macro_rules! value_debug {
     ($($arg:tt)+) => (debug!(target: "matex::value", $($arg)+));
 }
@@ -42,7 +41,7 @@ pub enum RunType {
     Product(Factors),
     Exponent(Box<RunVal>, Box<RunVal>),
 
-    Function(String, Box<RunVal>)
+    Function(String, Vec<RunVal>)
 }
 
 
@@ -254,7 +253,7 @@ impl RunVal {
 
 impl RunVal {
     pub(crate) fn simplify(&mut self) {
-        value_debug!("simplify");
+        value_debug!("simplify: {:?}", self);
         use RunType::*;
 
         if self.simplified {
@@ -265,30 +264,31 @@ impl RunVal {
 
         match &mut self.typ {
             Sum(terms) => {
-                value_debug!("simplify sum: {:?}", terms);
+                value_debug!("simplify sum");
                 value_debug!("recursive simplify factors");
                 for term in &mut terms.0 {
                     term.simplify();
                 }
 
+                //RunVal::combine_integers(terms);
                 RunVal::combine_like_terms(terms);
-
                 RunVal::combine_integers(terms);
 
-                RunVal::rearrange(terms);
+                //RunVal::rearrange(terms);
 
             }
             Product(factors) => {
-                value_debug!("simplify product: {:?}", factors);
+                value_debug!("simplify product");
 
                 value_debug!("recursive simplify factors");
                 for factor in &mut factors.0 {
                     factor.simplify();
                 }
 
+                let coeff = RunVal::extract_coefficient(factors);
+                
                 RunVal::combine_like_factors(factors);
 
-                let coeff = RunVal::extract_coefficient(factors);
 
                 let Factors(factors) = factors;
 
@@ -318,8 +318,8 @@ impl RunVal {
         
         let mut term_coefficients = RunVal::extract_coefficients(terms);
 
-        dbg!(&term_coefficients);
-        dbg!(&terms);
+        value_debug!("term_coefficients: {:?}", term_coefficients);
+        value_debug!("terms: {:?}", terms);
 
         let mut new_terms: VecDeque<RunVal> = VecDeque::new();
 
@@ -341,13 +341,15 @@ impl RunVal {
             if coefficient_total == 1.0 {
                 new_terms.push_front(term);
             } else if coefficient_total != 0.0 {
-                let term =
-                    RunType::Product(Factors(VecDeque::from([Number(coefficient_total).into(), term.into()])));
+                let mut term: RunVal =
+                    RunType::Product(Factors(VecDeque::from([Number(coefficient_total).into(), term]))).into();
+                    
+                term.simplify();                
 
                 if coefficient_total.is_sign_positive() {
-                    new_terms.push_front(term.into());
+                    new_terms.push_front(term);
                 } else {
-                    new_terms.push_back(term.into());
+                    new_terms.push_back(term);
                 }
             }
             dbg!(&new_terms);
@@ -396,19 +398,9 @@ impl RunVal {
 
             if found {
                 let mut exponents = RunVal::new(RunType::Sum(Terms(exponents)));
-                println!("_------------------------------");
-                println!("_------------------------------");
-                println!("_------------------------------");
-                dbg!(&exponents);
+                value_debug!("exponents before simplification: {:?}", &exponents);
                 exponents.simplify();
-                dbg!(&exponents);
-                println!("_------------------------------");
-                println!("_------------------------------");
-                println!("_------------------------------");
-                println!("_------------------------------");
-                println!("_------------------------------");
-                println!("_------------------------------");
-                println!("_------------------------------");
+                value_debug!("exponents after simplification: {:?}", &exponents);
                 let exponent = RunType::Exponent(Box::new(base), Box::new(exponents));
                 new_factors.push_back(exponent.into());
             } else {
@@ -473,6 +465,7 @@ impl RunVal {
                 let value = &mut v[0];
                 value.flatten();
                 *self = value.clone();
+            
             }
             _ => {}
         }
@@ -537,7 +530,7 @@ impl RunVal {
         let mut term_coefficients: Vec<(f64, RunVal)> = Vec::new();
 
         for term in terms {
-            dbg!(&term);
+            value_debug!("current term: {:?}", term);
 
             let coeff = if let RunType::Product(ref mut factors) = term.typ {
                 RunVal::extract_coefficient(factors)
@@ -547,7 +540,7 @@ impl RunVal {
 
             term.simplify();
             term_coefficients.push((coeff, term.clone()));
-            dbg!(&term_coefficients);
+            value_debug!("current term_coefficients: {:?}", term_coefficients);
         }
         term_coefficients
     }
@@ -564,8 +557,8 @@ impl RunVal {
 
             if let RunType::Number(n) = &factor.typ {
                 coeff *= *n;
-                dbg!(&coeff);
-                dbg!(&factor);
+                value_debug!("coeff: {}", coeff);
+                value_debug!("current factor: {:?}", factor);
                 factors.remove(index);
             } else {
                 index += 1;
@@ -604,7 +597,11 @@ impl fmt::Debug for RunVal {
             | RunType::Bool(_) 
             | RunType::Function(_, _) => write!(f, "{:?}", self.typ),
             _ => {
-                write!(f, "({}{:?})", if self.simplified { "" } else { "!" }, self.typ)
+                if self.simplified {
+                    write!(f, "({:?})", self.typ)
+                } else {
+                    write!(f, "{{{:?}}}", self.typ)
+                }
             }
         }
     }
@@ -619,11 +616,11 @@ impl From<RunType> for RunVal {
 impl fmt::Debug for RunType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            RunType::Unit => todo!(),
-            RunType::Undefined => todo!(),
+            RunType::Unit => write!(f, "unit"),
+            RunType::Undefined => write!(f, "undefined"),
             RunType::Number(n) => write!(f, "{}", n),
             RunType::Symbol(s) => write!(f, "'{}'", s),
-            RunType::Bool(_) => todo!(),
+            RunType::Bool(b) => write!(f, "{}", b),
             RunType::Sum(Terms(terms)) => {
                 write!(f, "(+, ")?;
                 let mut vec = Vec::<String>::new();
@@ -656,7 +653,9 @@ impl fmt::Debug for RunType {
                 write!(f, "(^, ({:?}), ({:?}))", base, exp)
             },
 
-            RunType::Function(_, _) => todo!(),
+            RunType::Function(name, args) => {
+                write!(f, "{}({:?})", name, args)
+            },
         }
     }
 }

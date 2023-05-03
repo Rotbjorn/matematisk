@@ -89,10 +89,15 @@ impl NormalFormatter {
                     str
                 }
             }
-            Function(name, argument) => {
-                let argument_str = Self::format(argument);
+            Function(name, arguments) => {
+                let mut args = Vec::new();
 
-                format!("{}({})", name, argument_str)
+                for argument in arguments {
+                    let argument_str = Self::format(argument);
+                    args.push(argument_str); 
+                }
+
+                format!("{}({})", name, args.join(", "))
             }
         }
     }

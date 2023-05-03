@@ -153,7 +153,7 @@ impl Runtime {
 
         let value = self.visit_expr(value);
 
-        dbg!(&holder, &value);
+        runtime_debug!("\n\tholder: {:?}\n\tvalue: {:?}", holder, value);
 
         self.environment
             .get_scope()
@@ -190,8 +190,13 @@ impl Runtime {
         runtime_debug!("func_name: {}", name);
         runtime_debug!("func_args: {:?}", arguments);
 
-        let Some(Function { name: _, params, body }) = self.environment.get_scope().functions.get(name).cloned() else {
-            return RunType::Unit.into();
+        let Some(Function { name: _, params, body }) = self.environment.get_scope().functions.get(name).cloned() else { 
+            let mut vec = Vec::new();
+            for argument in arguments {
+                let value = self.visit_expr(argument);
+                vec.push(value);
+            } 
+            return RunVal::new(RunType::Function(name.clone(), vec));
         };
 
         let mut new_scope = Scope::default();
