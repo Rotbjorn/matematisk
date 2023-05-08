@@ -293,15 +293,15 @@ impl Parser {
         parser_debug!("Parsing if expression");
         self.expect_keyword(KeywordType::If, "Expected if")?;
 
-        let condition = Box::new(self.parse_expression()?);
+        let condition = Box::new(self.expect_expression(Precedence::None)?);
 
         self.expect_keyword(KeywordType::Then, "Expected then after if condition.")?;
 
-        let body = Box::new(self.parse_expression()?);
+        let body = Box::new(self.expect_expression(Precedence::None)?);
 
         self.expect_keyword(KeywordType::Else, "Expected else after if body.")?;
 
-        let else_body = Box::new(self.parse_expression()?);
+        let else_body = Box::new(self.expect_expression(Precedence::None)?);
 
         let if_expr = Expr::If {
             condition,
@@ -338,6 +338,7 @@ impl Parser {
             let argument = self.parse_expression()?;
             args.push(argument);
         }
+
         self.expect(
             TokenType::RightParenthesis,
             "Expected parenthesis after arguments of function call",
@@ -350,7 +351,7 @@ impl Parser {
 
     fn parse_grouping(&mut self) -> ParseResult<Expr> {
         self.expect(TokenType::LeftParenthesis, "Expected opening parenthesis")?;
-        let node = self.parse_expression()?;
+        let node = self.expect_expression(Precedence::None)?;
         self.expect(TokenType::RightParenthesis, "Expected closing parenthesis")?;
 
         Ok(node)
@@ -359,7 +360,7 @@ impl Parser {
     fn parse_addition(&mut self, left: Expr) -> ParseResult<Expr> {
         parser_debug!("Parsing addition");
         self.expect(TokenType::Plus, "Expected addition operator")?;
-        let right = self.parse_precedence(Precedence::Factor)?;
+        let right = self.expect_expression(Precedence::Factor)?;
         let node = Expr::BinaryOp {
             left: left.into(),
             operation: BinOp::Add,
@@ -373,7 +374,7 @@ impl Parser {
     fn parse_subtraction(&mut self, left: Expr) -> ParseResult<Expr> {
         parser_debug!("Parsing subtraction");
         self.expect(TokenType::Minus, "Expected subtraction operator")?;
-        let right = self.parse_precedence(Precedence::Factor)?;
+        let right = self.expect_expression(Precedence::Factor)?;
 
         let node = Expr::BinaryOp {
             left: Box::new(left),
@@ -388,7 +389,11 @@ impl Parser {
     fn parse_multiplication(&mut self, left: Expr) -> ParseResult<Expr> {
         parser_debug!("Parsing multiplication");
         self.expect(TokenType::Star, "Expected multiplication operator")?;
-        let right = self.parse_precedence(Precedence::Exponent)?;
+        let right = self.expect_expression(Precedence::Exponent)?;
+        // let Ok(right) = right else {
+            // parser_error!("ERROR: {:?}", right.clone().err().unwrap());
+            // return right;
+        // };
         let node = Expr::BinaryOp {
             left: left.into(),
             operation: BinOp::Multiply,
@@ -402,7 +407,7 @@ impl Parser {
     fn parse_division(&mut self, left: Expr) -> ParseResult<Expr> {
         parser_debug!("Parsing division");
         self.consume()?;
-        let right = self.parse_precedence(Precedence::Exponent)?;
+        let right = self.expect_expression(Precedence::Exponent)?;
 
         let node = Expr::BinaryOp {
             left: Box::new(left),
@@ -418,7 +423,7 @@ impl Parser {
         parser_debug!("Parsing power");
         // TODO: Something higher than Exponent?
         self.expect(TokenType::Caret, "Expected power operator")?;
-        let right = self.parse_precedence(Precedence::Exponent)?;
+        let right = self.expect_expression(Precedence::Exponent)?;
 
         let node = Expr::BinaryOp {
             left: Box::new(left),
@@ -445,7 +450,7 @@ impl Parser {
             });
         }
 
-        let right = self.parse_precedence(Precedence::Term)?;
+        let right = self.expect_expression(Precedence::Term)?;
 
         Ok(Expr::BinaryOp {
             left: Box::new(left),
@@ -461,7 +466,7 @@ impl Parser {
             "Expected assignment operator after variable name.",
         )?;
 
-        let value = self.parse_expression()?;
+        let value = self.expect_expression(Precedence::None)?;
 
         Ok(Expr::Assignment {
             holder: Box::new(holder),
@@ -473,7 +478,7 @@ impl Parser {
         parser_debug!("Parsing unary minus");
         self.expect(TokenType::Minus, "Expected unary minus before expression")?;
 
-        let expr = self.parse_precedence(Precedence::Unary)?;
+        let expr = self.expect_expression(Precedence::Unary)?;
 
         let unary = Expr::Unary(Box::new(expr));
 
@@ -484,6 +489,14 @@ impl Parser {
 }
 
 impl Parser {
+    fn expect_expression(&mut self, prec: Precedence) -> ParseResult<Expr> {
+        let expr = self.parse_precedence(prec);
+        if let Err(ParseError::EndOfStream) = expr {
+            return Err(ParseError::UnexpectedEndOfStream { message: "Expected an expression".to_string() });
+        }
+        return expr;
+    }
+
     fn expect(&mut self, expected_type: TokenType, message: &str) -> ParseResult<Token> {
         parser_debug!("Expecting {:?}", expected_type);
 

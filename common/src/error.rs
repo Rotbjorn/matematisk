@@ -27,6 +27,9 @@ pub enum ParseError {
         message: String,
         actual: Token,
     },
+    UnexpectedEndOfStream {
+        message: String
+    },
     EndOfStream,
 }
 
@@ -44,6 +47,7 @@ impl Display for ParseError {
                 expected: _,
                 actual: _,
             } => f.write_str(message),
+            UnexpectedEndOfStream { message } => f.write_str(message),
             NotIdentifier { message, actual: _ } => f.write_str(message),
             NotComparison { message, actual: _ } => f.write_str(message),
             EndOfStream => f.write_str("End of stream"),

@@ -81,8 +81,8 @@ impl Runtime {
         runtime_debug!("Visit variable");
         runtime_debug!("name: {}", name);
 
-        if let Some(variable) = self.environment.get_scope().variables.get(name) {
-            variable.clone()
+        if let Some(value) = self.environment.get_scope().variables.get(name) {
+            value.clone()
         } else {
             RunType::Symbol(name.clone()).into()
         }

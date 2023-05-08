@@ -3,11 +3,11 @@ use std::{cmp::Ordering, fmt::{Debug, self}};
 #[cfg(target_arch = "wasm32")]
 use serde::{Deserialize, Serialize};
 
-use log::{debug};
+use log::{debug, error};
 use super::format::ValueFormatter;
 
 macro_rules! value_debug {
-    ($($arg:tt)+) => (debug!(target: "matex::value", $($arg)+));
+    ($($arg:tt)+) => (debug!(target: "matex::value", "[{}:{}] {}", file!(), line!(), &format!($($arg)+)));
 }
 
 #[allow(unused_macros)]
@@ -19,7 +19,6 @@ macro_rules! value_error {
 #[derive(Clone, PartialEq)]
 #[cfg_attr(target_arch = "wasm32", derive(Serialize, Deserialize))]
 // Better name
-
 pub struct RunVal {
     pub(crate) simplified: bool,
     pub typ: RunType,
@@ -67,104 +66,114 @@ impl RunVal {
         }
     }
 
-    pub(crate) fn add(mut self, mut other: RunVal) -> RunVal {
+    pub(crate) fn add(self, other: RunVal) -> RunVal {
         value_debug!("add: {:?} + {:?}", self, other);
         use RunType::*;
 
-        let typ = match (&mut self.typ, &mut other.typ) {
+        let typ = match (self.typ, other.typ) {
             (Unit, _) | (_, Unit)
             | (Undefined, _) | (_, Undefined) => Undefined.into(),
 
             (Bool(_), _) | (_, Bool(_)) => panic!("No addition with booleans"),
 
-            (Number(lhs), Number(rhs)) => Number(*lhs + *rhs),
+            (Number(lhs), Number(rhs)) => Number(lhs + rhs),
 
-            (Sum(Terms(v)), _) => {
-                v.push(other);
-                self.typ
+            (Sum(Terms(mut v)), Sum(Terms(other_v))) => {
+                v.extend(other_v);
+                Sum(Terms(v))
             }
 
-            (_, Sum(Terms(v))) => {
-                v.push(self);
-                other.typ
+            (Sum(Terms(mut v)), o) => {
+                v.push(o.into());
+                Sum(Terms(v))
             }
 
-            (Number(_), Symbol(_))
-            | (Number(_), Product(_))
-            | (Number(_), Exponent(_, _))
-            | (Number(_), Function(_, _))
-            | (Symbol(_), Number(_))
-            | (Symbol(_), Symbol(_))
-            | (Symbol(_), Product(_))
-            | (Symbol(_), Exponent(_, _))
-            | (Symbol(_), Function(_, _)) 
-            | (Product(_), Number(_))
-            | (Product(_), Symbol(_))
-            | (Product(_), Product(_))
-            | (Product(_), Exponent(_, _))
-            | (Product(_), Function(_, _)) 
-            | (Exponent(_, _), Number(_))
-            | (Exponent(_, _), Symbol(_))
-            | (Exponent(_, _), Product(_))
-            | (Exponent(_, _), Exponent(_, _))
-            | (Exponent(_, _), Function(_, _)) 
-            | (Function(_, _), Number(_)) 
-            | (Function(_, _), Symbol(_)) 
-            | (Function(_, _), Product(_))
-            | (Function(_, _), Exponent(_, _))
-            | (Function(_, _), Function(_, _)) => {
-                RunType::Sum(Terms(Vec::from([self, other])))
+            (s, Sum(Terms(mut v))) => {
+                v.push(s.into());
+                Sum(Terms(v))
+            }
+
+            (s@Number(_), o@Symbol(_))
+            | (s@Number(_), o@Product(_))
+            | (s@Number(_), o@Exponent(_, _))
+            | (s@Number(_), o@Function(_, _))
+            | (s@Symbol(_), o@Number(_))
+            | (s@Symbol(_), o@Symbol(_))
+            | (s@Symbol(_), o@Product(_))
+            | (s@Symbol(_), o@Exponent(_, _))
+            | (s@Symbol(_), o@Function(_, _)) 
+            | (s@Product(_), o@Number(_))
+            | (s@Product(_), o@Symbol(_))
+            | (s@Product(_), o@Product(_))
+            | (s@Product(_), o@Exponent(_, _))
+            | (s@Product(_), o@Function(_, _)) 
+            | (s@Exponent(_, _), o@Number(_))
+            | (s@Exponent(_, _), o@Symbol(_))
+            | (s@Exponent(_, _), o@Product(_))
+            | (s@Exponent(_, _), o@Exponent(_, _))
+            | (s@Exponent(_, _), o@Function(_, _)) 
+            | (s@Function(_, _), o@Number(_)) 
+            | (s@Function(_, _), o@Symbol(_)) 
+            | (s@Function(_, _), o@Product(_))
+            | (s@Function(_, _), o@Exponent(_, _))
+            | (s@Function(_, _), o@Function(_, _)) => {
+                RunType::Sum(Terms(Vec::from([s.into(), o.into()])))
             }
         };
 
          RunVal::new(typ)
     }
-    pub(crate) fn multiply(mut self, mut other: RunVal) -> RunVal {
+    pub(crate) fn multiply(self, other: RunVal) -> RunVal {
         value_debug!("multiply: {:?} * {:?}", self, other);
         use RunType::*;
-        let typ = match (&mut self.typ, &mut other.typ) {
+        let typ = match (self.typ, other.typ) {
             (Unit, _) | (_, Unit) 
             | (Undefined, _) | (_, Undefined)=> Undefined,
 
             (Bool(_), _) | (_, Bool(_)) => panic!("No multiplication with booleans"),
 
-            (Number(lhs), Number(rhs)) => Number(*lhs * *rhs),
+            (Number(lhs), Number(rhs)) => Number(lhs * rhs),
 
-            (Product(Factors(v)), _) => {
-                v.push(other);
-                self.typ
+            (Product(Factors(mut v)), Product(Factors(other_v))) => {
+                v.extend(other_v);
+                Product(Factors(v))
             }
 
-            (_, Product(Factors(v))) => {
-                v.push(self);
-                other.typ
+            (Product(Factors(mut v)), o) => {
+                v.push(o.into());
+                Product(Factors(v))
             }
 
-            (Number(_), Symbol(_))
-            | (Number(_), Sum(_))
-            | (Number(_), Exponent(_, _))
-            | (Number(_), Function(_, _))
-            | (Symbol(_), Number(_))
-            | (Symbol(_), Symbol(_))
-            | (Symbol(_), Sum(_))
-            | (Symbol(_), Exponent(_, _))
-            | (Symbol(_), Function(_, _))
-            | (Sum(_), Number(_))
-            | (Sum(_), Symbol(_))
-            | (Sum(_), Sum(_))
-            | (Sum(_), Exponent(_, _))
-            | (Sum(_), Function(_, _)) 
-            | (Exponent(_, _), Number(_))
-            | (Exponent(_, _), Symbol(_))
-            | (Exponent(_, _), Sum(_))
-            | (Exponent(_, _), Exponent(_, _))
-            | (Exponent(_, _), Function(_, _))
-            | (Function(_, _), Number(_))
-            | (Function(_, _), Symbol(_))
-            | (Function(_, _), Sum(_))
-            | (Function(_, _), Exponent(_, _))
-            | (Function(_, _), Function(_, _)) => {
-                RunType::Product(Factors(Vec::from([self, other])))
+            (o, Product(Factors(mut v))) => {
+                v.push(o.into());
+                Product(Factors(v))
+            }
+
+            (s@Number(_), o@Symbol(_))
+            | (s@Number(_), o@Sum(_))
+            | (s@Number(_), o@Exponent(_, _))
+            | (s@Number(_), o@Function(_, _))
+            | (s@Symbol(_), o@Number(_))
+            | (s@Symbol(_), o@Symbol(_))
+            | (s@Symbol(_), o@Sum(_))
+            | (s@Symbol(_), o@Exponent(_, _))
+            | (s@Symbol(_), o@Function(_, _))
+            | (s@Sum(_), o@Number(_))
+            | (s@Sum(_), o@Symbol(_))
+            | (s@Sum(_), o@Sum(_))
+            | (s@Sum(_), o@Exponent(_, _))
+            | (s@Sum(_), o@Function(_, _)) 
+            | (s@Exponent(_, _), o@Number(_))
+            | (s@Exponent(_, _), o@Symbol(_))
+            | (s@Exponent(_, _), o@Sum(_))
+            | (s@Exponent(_, _), o@Exponent(_, _))
+            | (s@Exponent(_, _), o@Function(_, _))
+            | (s@Function(_, _), o@Number(_))
+            | (s@Function(_, _), o@Symbol(_))
+            | (s@Function(_, _), o@Sum(_))
+            | (s@Function(_, _), o@Exponent(_, _))
+            | (s@Function(_, _), o@Function(_, _)) => {
+                RunType::Product(Factors(Vec::from([s.into(), o.into()])))
             }
         };
 
@@ -192,7 +201,7 @@ impl RunVal {
             | (Symbol(_), Sum(_))
             | (Symbol(_), Product(_))
             | (Symbol(_), Exponent(_, _))
-            | (Symbol(_), Function(_, _)) => todo!(),
+            | (Symbol(_), Function(_, _)) 
             | (Sum(_), Number(_))
             | (Sum(_), Symbol(_))
             | (Sum(_), Sum(_))
@@ -295,6 +304,7 @@ impl RunVal {
 
                 RunVal::combine_like_factors(factors);
 
+                value_debug!("after combined: {:?}", factors);
 
                 let Factors(factors) = factors;
 
@@ -303,6 +313,7 @@ impl RunVal {
                 }
             }
             Exponent(base, exp) => {
+                value_debug!("simplify exponent");
                 base.simplify();
                 exp.simplify();
             }
@@ -310,24 +321,24 @@ impl RunVal {
         }
         self.flatten();
         self.simplified = true;
-        dbg!(&self);
+        value_debug!("current self after simplify: {:?}", self);
     }
 
     pub(crate) fn combine_like_terms(terms: &mut Terms) {
         value_debug!("combining like terms");
         use RunType::*;
-        // Extract the coefficients from each term
         if terms.0.len() <= 1 {
             value_debug!("returning; only one item, nothing to combine.");
             return;
         }
         
+        // Extract the coefficients from each term
         let mut term_coefficients = RunVal::extract_coefficients(terms);
 
         value_debug!("term_coefficients: {:?}", term_coefficients);
         value_debug!("terms: {:?}", terms);
 
-        let mut new_terms: Vec<RunVal> = Vec::new();
+        let mut new_terms: RunVal = Sum(Terms(Vec::new())).into();
 
         while let Some((co_eff, term)) = term_coefficients.pop() {
             let mut coefficient_total = co_eff;
@@ -345,7 +356,7 @@ impl RunVal {
             }
 
             if coefficient_total == 1.0 {
-                new_terms.push(term);
+                new_terms = new_terms.add(term);
             } else if coefficient_total != 0.0 {
                 let mut term: RunVal =
                     RunType::Product(Factors(Vec::from([Number(coefficient_total).into(), term]))).into();
@@ -353,34 +364,48 @@ impl RunVal {
                 term.simplify();                
 
                 if coefficient_total.is_sign_positive() {
-                    new_terms.push(term);
+                    new_terms = new_terms.add(term);
                 } else {
-                    new_terms.push(term);
+                    new_terms = new_terms.add(term);
                 }
             }
-            dbg!(&new_terms);
+            value_debug!("current new_terms: {:?}", new_terms);
         }
-        *terms = Terms(new_terms);
+        let Sum(new_terms) = new_terms.typ else {
+            value_error!("There is no way that we should end up here...");
+            panic!("STOPPING");
+        };
+        *terms = new_terms
     }
 
     pub(crate) fn combine_like_factors(factors: &mut Factors) {
         value_debug!("combining like factors");
+        use RunType::*;
+
+        if factors.0.len() <= 1 {
+            value_debug!("returning; only one item, nothing to combine.");
+            return;
+        }
+
         let factors_vec = &mut factors.0;
         let mut new_factors: Vec<RunVal> = Vec::new();
 
         while let Some(factor) = factors_vec.pop() {
+            value_debug!("current factor: {:?}", factor);
 
-            let mut exponents: Vec<RunVal> = Vec::new();
+            let mut exponents_vec: Vec<RunVal> = Vec::new();
 
             let mut found = false;
 
-            let base = if let RunType::Exponent(base, exp) = factor.typ {
-                exponents.push(*exp);
+            let base = if let Exponent(base, exp) = factor.typ {
+                exponents_vec.push(*exp);
                 *base
             } else {
-                exponents.push(RunType::Number(1.0).into());
+                exponents_vec.push(Number(1.0).into());
                 factor
             };
+
+            let mut exponents: RunVal = Sum(Terms(exponents_vec)).into();
 
             let mut i = 0;
             while i < factors_vec.len() {
@@ -388,13 +413,13 @@ impl RunVal {
 
                 if base.struct_equal(other_factor) {
                     found = true;
-                    exponents.push(RunType::Number(1.0).into());
+                    exponents = exponents.add(Number(1.0).into());
                     factors_vec.remove(i);
                     continue
-                } else if let RunType::Exponent(other_base, other_exp) = &other_factor.typ {
+                } else if let Exponent(other_base, other_exp) = &other_factor.typ {
                     if base.struct_equal(other_base) {
                         found = true;
-                        exponents.push(*other_exp.clone());
+                        exponents = exponents.add(*other_exp.clone());
                         factors_vec.remove(i);
                         continue
                     }
@@ -403,11 +428,10 @@ impl RunVal {
             }
 
             if found {
-                let mut exponents = RunVal::new(RunType::Sum(Terms(exponents)));
                 value_debug!("exponents before simplification: {:?}", &exponents);
                 exponents.simplify();
                 value_debug!("exponents after simplification: {:?}", &exponents);
-                let exponent = RunType::Exponent(Box::new(base), Box::new(exponents));
+                let exponent = Exponent(Box::new(base), Box::new(exponents));
                 new_factors.push(exponent.into());
             } else {
                 new_factors.push(base.into()); 
@@ -430,8 +454,9 @@ impl RunVal {
         }
 
         if total == 0.0 && terms.len() != 0 {
+            // TODO: If there are no terms left, then add the zero as the only term?
+            // Alternatively just check at printing if the most outer expression is an empty sum?
             return;
-            // If there are no terms left, then add the zero as the only term.
         }
 
         let constant = RunType::Number(total);
@@ -505,7 +530,6 @@ impl RunVal {
                     return false;
                 }
 
-                // Verify that the vectors `factors` and `other` are structurally equal:
                 let mut factors_remaining = other.iter().collect::<Vec<_>>();
 
                 'outer: for factor in factors {
@@ -559,7 +583,7 @@ impl RunVal {
         while index < factors.len() {
             let factor = &factors[index];
 
-            dbg!(&factor);
+            value_debug!("current factor: {:?}", factor);
 
             if let RunType::Number(n) = &factor.typ {
                 coeff *= *n;
