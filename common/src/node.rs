@@ -57,6 +57,8 @@ pub enum BinOp {
     Divide,
     Power,
 
+    Equal,
+
     Less,
     LessEqual,
     Greater,
@@ -69,35 +71,38 @@ pub enum BinOp {
 
 impl BinOp {
     pub fn precedence(self) -> Precedence {
+        use BinOp::*;
         match self {
-            BinOp::Add | BinOp::Subtract => Precedence::Term,
-            BinOp::Multiply | BinOp::Divide => Precedence::Factor,
-            BinOp::Power => Precedence::Exponent,
+            Add | Subtract => Precedence::Term,
+            Multiply | Divide => Precedence::Factor,
+            Power => Precedence::Exponent,
 
-            BinOp::Less | BinOp::LessEqual | BinOp::Greater | BinOp::GreaterEqual => {
+            Equal | Less | LessEqual | Greater | GreaterEqual => {
                 Precedence::Comparison
             }
 
-            BinOp::Assignment => Precedence::Assignment,
+            Assignment => Precedence::Assignment,
 
-            BinOp::None => Precedence::None,
+            None => Precedence::None,
         }
     }
 }
 
 impl From<&TokenType> for BinOp {
     fn from(value: &TokenType) -> Self {
+        use BinOp::*;
         match value {
-            TokenType::Plus => BinOp::Add,
-            TokenType::Minus => BinOp::Subtract,
-            TokenType::Star => BinOp::Multiply,
-            TokenType::Slash => BinOp::Divide,
-            TokenType::Caret => BinOp::Power,
-            TokenType::Less => BinOp::Less,
-            TokenType::LessEqual => BinOp::LessEqual,
-            TokenType::Greater => BinOp::Greater,
-            TokenType::GreaterEqual => BinOp::GreaterEqual,
-            _ => BinOp::None,
+            TokenType::Plus => Add,
+            TokenType::Minus => Subtract,
+            TokenType::Star => Multiply,
+            TokenType::Slash => Divide,
+            TokenType::Caret => Power,
+            TokenType::EqualEqual => Equal,
+            TokenType::Less => Less,
+            TokenType::LessEqual => LessEqual,
+            TokenType::Greater => Greater,
+            TokenType::GreaterEqual => GreaterEqual,
+            _ => None,
         }
     }
 }
@@ -146,7 +151,7 @@ impl<'a, W: Write> ASTGraphGenerator<'a, W> {
 
         self.out.write_char('}')?;
 
-        Ok(())
+        return Ok(())
     }
 
     fn create_node(&mut self, label: &str) -> GraphResult<u32> {

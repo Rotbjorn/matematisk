@@ -22,6 +22,14 @@ impl Environment {
     pub fn pop_scope(&mut self) {
         let _ = self.scopes.pop();
     }
+    pub fn get_function(&mut self, name: &str) -> Option<&Function> {
+        for scope in self.scopes.iter().rev() {
+            if let Some(function) = scope.functions.get(name) {
+                return Some(function);
+            }
+        }
+        return None;
+    }
 }
 
 #[derive(Default, Debug)]

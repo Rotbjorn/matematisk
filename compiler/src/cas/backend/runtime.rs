@@ -5,6 +5,8 @@ use matex_common::node::Visitor;
 
 use log::{debug, error};
 
+use crate::cas::backend::value::{Terms, Factors};
+
 use super::environment::{Environment, Scope};
 use super::value::{RunType, RunVal};
 
@@ -17,6 +19,7 @@ macro_rules! runtime_error {
 }
 pub struct Runtime {
     pub environment: Environment,
+    assign: bool
 }
 
 impl Runtime {
@@ -29,6 +32,7 @@ impl Runtime {
             environment: Environment {
                 scopes: vec![Scope::default()],
             },
+            assign: false,
         }
     }
 }
@@ -81,8 +85,14 @@ impl Runtime {
         runtime_debug!("Visit variable");
         runtime_debug!("name: {}", name);
 
-        if let Some(value) = self.environment.get_scope().variables.get(name) {
-            value.clone()
+        if self.assign {
+            return RunType::Symbol(name.clone()).into()
+        }
+
+        if let Some(mut value) = self.environment.get_scope().variables.get(name).cloned() {
+            runtime_debug!("value of variable: {:?}", value);
+            self.get_reactive_value(&mut value); 
+            return value;
         } else {
             RunType::Symbol(name.clone()).into()
         }
@@ -126,6 +136,8 @@ impl Runtime {
             }
             BinOp::Power => lhs.power(rhs),
 
+            BinOp::Equal => lhs.equal(rhs),
+
             BinOp::Less => lhs.less(rhs),
             BinOp::LessEqual => lhs.less_equal(rhs),
             BinOp::Greater => lhs.greater(rhs),
@@ -146,12 +158,15 @@ impl Runtime {
         runtime_debug!("Visit assignment");
         runtime_debug!("holder: {:?}", holder);
         runtime_debug!("value: {:?}", value);
+
         // TODO: Move ownership instead?
         let Expr::Variable(holder) = holder else {
             panic!("Unhandled holder expression");
         };
 
+        self.assign = true;
         let value = self.visit_expr(value);
+        self.assign = false;
 
         runtime_debug!("\n\tholder: {:?}\n\tvalue: {:?}", holder, value);
 
@@ -190,7 +205,7 @@ impl Runtime {
         runtime_debug!("func_name: {}", name);
         runtime_debug!("func_args: {:?}", arguments);
 
-        let Some(Function { name: _, params, body }) = self.environment.get_scope().functions.get(name).cloned() else { 
+        let Some(Function { name: _, params, body }) = self.environment.get_function(name).cloned() else {
             let mut vec = Vec::new();
             for argument in arguments {
                 let value = self.visit_expr(argument);
@@ -211,6 +226,7 @@ impl Runtime {
 
         self.environment.push_scope(new_scope);
 
+        self.assign = false;
         let value = self.visit_expr(&body);
 
         // Reset the scope again???
@@ -220,9 +236,39 @@ impl Runtime {
     }
 }
 
+impl Runtime {
+    fn get_reactive_value(&mut self, value: &mut RunVal) {
+        use RunType::*; 
+        match &mut value.typ {
+            Symbol(sym) => {
+                if let Some(mut variable_value) = self.environment.get_scope().variables.get(sym).cloned() {
+                    self.get_reactive_value(&mut variable_value);
+                    *value = variable_value;
+                }
+            }
+
+            Product(Factors(vec)) 
+            | Sum(Terms(vec)) => {
+                for item in vec {
+                    self.get_reactive_value(item);
+                }
+            }
+            Exponent(base, exp) => {
+                self.get_reactive_value(base);
+                self.get_reactive_value(exp);
+            }
+            Function(_, _) => todo!(),
+
+            Unit 
+            | Undefined 
+            | Number(_) 
+            | Bool(_) => {}
+        }
+    }
+}
+
 impl Visitor<RunVal> for Runtime {
     // TODO: Take ownership instead, since statements are never visited twice
-    // Make sure Program is its own type, and not a statement.
     fn visit_statement(&mut self, statement: &Statement) -> RunVal {
         use Statement::*;
         match statement {
@@ -237,7 +283,7 @@ impl Visitor<RunVal> for Runtime {
     }
 
     fn visit_expr(&mut self, expr: &Expr) -> RunVal {
-        match expr {
+        let mut value = match expr {
             Expr::Number(n) => RunType::Number(*n).into(),
             Expr::Variable(name) => self.visit_variable(name),
             Expr::List(_) => todo!("Not handling List"),
@@ -261,6 +307,11 @@ impl Visitor<RunVal> for Runtime {
                 else_body,
             } => self.visit_if(condition, body, else_body),
             Expr::FunctionCall { name, args } => self.visit_function_call(name, args),
-        }
+        };
+        value.simplify();
+        return value;
     }
+
+
+
 }

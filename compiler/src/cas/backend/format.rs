@@ -31,7 +31,7 @@ impl NormalFormatter {
                     s.clone()
                 }
             }
-            Bool(b) => format!(" + {}", b),
+            Bool(b) => format!("{}", b),
             Sum(Terms(terms)) => {
                 let mut buffer = String::new();
                 for (i, term) in terms.iter().enumerate() {
@@ -71,12 +71,13 @@ impl NormalFormatter {
                 if prec == Precedence::Term {
                     format!(" {} {}", if negative_term { "-" } else { "+" }, mul_string)
                 } else if prec == Precedence::Exponent {
-                    format!("({})", mul_string)
+                    format!("({}{})", if negative_term { "-" } else { "" }, mul_string)
                 } else {
                     format!("{}{}", if negative_term { "-" } else { "" }, mul_string)
                 }
             }
             Exponent(base, exp) => {
+                // TODO: Check if exponent is negative => turn into fraction instead
                 let base_str = Self::format_impl(base, Precedence::Exponent);
                 let exp_str = Self::format_impl(exp, Precedence::Exponent);
 

@@ -117,6 +117,7 @@ impl Lexer {
                 let mut token_type = TokenType::Equal;
                 if let Some(next) = self.peek_char() {
                     if next == '=' {
+                        self.next_char();
                         token_type = TokenType::EqualEqual
                     }
                 }

@@ -47,7 +47,8 @@ impl REPL {
             let result = parser.parse();
             match result {
                 Ok(ast) => {
-                    let exit_value = self.runtime.run(&ast);
+                    let mut exit_value = self.runtime.run(&ast);
+                    exit_value.rearrange();
 
                     let formatted_value = NormalFormatter::format(&exit_value);
 

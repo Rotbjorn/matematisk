@@ -10,11 +10,11 @@ use matex_common::{
 };
 
 macro_rules! parser_debug {
-    ($($arg:tt)+) => (debug!(target: "matex::parser", $($arg)+));
+    ($($arg:tt)+) => (debug!(target: "matex::parser", "[{}:{}] {}", file!(), line!(), &format!($($arg)+)));
 }
 
 macro_rules! parser_error {
-    ($($arg:tt)+) => (error!(target: "matex::parser", $($arg)+));
+    ($($arg:tt)+) => (error!(target: "matex::parser", "[{}:{}] {}", file!(), line!(), &format!($($arg)+)));
 }
 
 type ParseResult<T> = std::result::Result<T, ParseError>;
@@ -165,17 +165,25 @@ impl Parser {
         parser_debug!("Parsing parameter definition");
         let (_, param_name) = self.expect_identifier("Expected parameter name")?;
 
-        // TODO: Do not use expect? => Instead check if type annotation is present to start with.
-        self.expect(TokenType::Colon, "Expected colon after parameter name.")?;
-
-        let (_, type_name) = self.expect_identifier("Expected type name after semicolon.")?;
-
-        let param = Parameter {
+        let mut param = Parameter {
             name: param_name,
-            type_name,
+            type_name: "".to_string(),
         };
 
-        Ok(param)
+        // TODO: Do not use expect? => Instead check if type annotation is present to start with.
+        let Some(next) = self.peek(0) else {
+            return Ok(param);
+        };
+
+        if next.typ != TokenType::Colon {
+            return Ok(param);
+        }
+
+        self.expect(TokenType::Colon, "Expected colon after parameter name.")?;
+        let (_, type_name) = self.expect_identifier("Expected type name after semicolon.")?;
+
+        param.type_name = type_name;
+        return Ok(param);
     }
 
     fn parse_unset_statement(&mut self) -> ParseResult<Statement> {
@@ -224,7 +232,7 @@ impl Parser {
                 Star => self.parse_multiplication(node)?,
                 Slash => self.parse_division(node)?,
                 Caret => self.parse_power(node)?,
-                Less | LessEqual | Greater | GreaterEqual => self.parse_comparison(node)?,
+                EqualEqual | Less | LessEqual | Greater | GreaterEqual => self.parse_comparison(node)?,
                 Equal => self.parse_assignment(node)?,
                 _ => {
                     // TODO: Support custom infix operators?
