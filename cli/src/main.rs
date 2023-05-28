@@ -11,7 +11,7 @@ use matex_compiler::cas::{
 };
 
 use clap::{Parser, Subcommand};
-use repl::REPL;
+use repl::Repl;
 
 mod repl;
 
@@ -81,7 +81,7 @@ fn main() {
 
         println!("EXIT VALUE: {:?}", exit_value);
     } else {
-        let mut repl = REPL::new();
+        let mut repl = Repl::new();
         let _ = repl.run();
     }
 }

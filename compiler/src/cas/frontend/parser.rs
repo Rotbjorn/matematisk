@@ -170,7 +170,6 @@ impl Parser {
             type_name: "".to_string(),
         };
 
-        // TODO: Do not use expect? => Instead check if type annotation is present to start with.
         let Some(next) = self.peek(0) else {
             return Ok(param);
         };
@@ -183,7 +182,7 @@ impl Parser {
         let (_, type_name) = self.expect_identifier("Expected type name after semicolon.")?;
 
         param.type_name = type_name;
-        return Ok(param);
+        Ok(param)
     }
 
     fn parse_unset_statement(&mut self) -> ParseResult<Statement> {
@@ -502,7 +501,7 @@ impl Parser {
         if let Err(ParseError::EndOfStream) = expr {
             return Err(ParseError::UnexpectedEndOfStream { message: "Expected an expression".to_string() });
         }
-        return expr;
+        expr
     }
 
     fn expect(&mut self, expected_type: TokenType, message: &str) -> ParseResult<Token> {

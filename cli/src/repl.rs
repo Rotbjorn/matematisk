@@ -11,14 +11,16 @@ use matex_compiler::cas::{
 };
 use rustyline::error::ReadlineError;
 
-pub struct REPL {
+pub struct Repl {
     runtime: Runtime,
 }
 
-impl REPL {
+impl Repl {
     pub fn new() -> Self {
+        let mut runtime = Runtime::new();
+        runtime.add_standard_environment();
         Self {
-            runtime: Runtime::new(),
+            runtime
         }
     }
     pub fn run(&mut self) -> Result<(), ReadlineError> {
@@ -144,7 +146,7 @@ impl FromStr for Command {
 
         let command = command.parse::<CommandType>()?;
 
-        Ok(Command::new(command, &args))
+        Ok(Command::new(command, args))
     }
 }
 

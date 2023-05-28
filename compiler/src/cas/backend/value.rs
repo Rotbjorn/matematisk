@@ -56,7 +56,7 @@ pub struct Terms(pub Vec<RunVal>);
 
 impl RunVal {
     pub fn format<T: ValueFormatter>(&self) {
-        T::format(&self);
+        T::format(self);
     }
 
     pub(crate) fn new(typ: RunType) -> Self{
@@ -73,7 +73,7 @@ impl RunVal {
 
         let typ = match (self.typ, other.typ) {
             (Unit, _) | (_, Unit)
-            | (Undefined, _) | (_, Undefined) => Undefined.into(),
+            | (Undefined, _) | (_, Undefined) => Undefined,
 
             (Bool(_), _) | (_, Bool(_)) => panic!("No addition with booleans"),
 
@@ -200,8 +200,7 @@ impl RunVal {
             | (Exponent(base, exp), o@Product(_))
             | (Exponent(base, exp), o@Exponent(_, _))
             | (Exponent(base, exp), o@Function(_, _)) => {
-
-                return Exponent(base, Box::new(exp.multiply(o.into()))).into();
+                Exponent(base, Box::new(exp.multiply(o.into()))).into()
             }
 
             (s@Number(_), o@Symbol(_))
@@ -392,8 +391,6 @@ impl RunVal {
 
                 if coefficient_total.is_sign_positive() {
                     new_terms = new_terms.add(term);
-                } else {
-                    new_terms = new_terms.add(term);
                 }
             }
             value_debug!("current new_terms: {:?}", new_terms);
@@ -475,7 +472,7 @@ impl RunVal {
                     new_factors.push(exponent.into());
                 }
             } else {
-                new_factors.push(base.into()); 
+                new_factors.push(base); 
             }
         }
         *factors_vec = new_factors;
@@ -495,7 +492,7 @@ impl RunVal {
             }
         }
 
-        if total == 0.0 && terms.len() != 0 {
+        if total == 0.0 && terms.is_empty() {
             // TODO: If there are no terms left, then add the zero as the only term?
             // Alternatively just check at printing if the most outer expression is an empty sum?
             return;
@@ -515,7 +512,7 @@ impl RunVal {
                     dbg!(&b);
                     match (&a.typ, &b.typ) {
                         (_, o@Number(_))|(_, o@Product(_)) => {
-                            return if RunVal::value_is_negative(o) {
+                            if RunVal::value_is_negative(o) {
                                 Ordering::Less
                             } else {
                                 Ordering::Greater
@@ -599,7 +596,7 @@ impl RunVal {
                 true
             }
             (RunType::Exponent(base, exp), RunType::Exponent(other_base, other_exp)) => {
-                base.struct_equal(&other_base) && exp.struct_equal(&other_exp)
+                base.struct_equal(other_base) && exp.struct_equal(other_exp)
             }
             (RunType::Number(num), RunType::Number(other)) => num == other,
             (RunType::Symbol(symbol), RunType::Symbol(other)) => symbol == other,

@@ -151,7 +151,7 @@ impl<'a, W: Write> ASTGraphGenerator<'a, W> {
 
         self.out.write_char('}')?;
 
-        return Ok(())
+        Ok(())
     }
 
     fn create_node(&mut self, label: &str) -> GraphResult<u32> {

@@ -11,15 +11,16 @@ use super::environment::{Environment, Scope};
 use super::value::{RunType, RunVal};
 
 macro_rules! runtime_debug {
-    ($($arg:tt)+) => (debug!(target: "matex::runtime", $($arg)+));
+    ($($arg:tt)+) => (debug!(target: "matex::runtime", "[{}:{}] {}", file!(), line!(), &format!($($arg)+)));
 }
 
 macro_rules! runtime_error {
-    ($($arg:tt)+) => (error!(target: "matex::runtime", $($arg)+));
+    ($($arg:tt)+) => (error!(target: "matex::runtime", "[{}:{}] {}", file!(), line!(), &format!($($arg)+)));
 }
 pub struct Runtime {
     pub environment: Environment,
-    assign: bool
+    assign: bool,
+    in_func_call: bool,
 }
 
 impl Runtime {
@@ -31,8 +32,10 @@ impl Runtime {
         Self {
             environment: Environment {
                 scopes: vec![Scope::default()],
+                ..Default::default()
             },
             assign: false,
+            in_func_call: false,
         }
     }
 }
@@ -64,10 +67,7 @@ impl Runtime {
             body: function_body.clone(),
         };
 
-        self.environment
-            .get_scope()
-            .functions
-            .insert(func_name.to_owned(), function);
+        self.environment.set_func(func_name, function);
 
         RunType::Unit.into()
     }
@@ -76,7 +76,7 @@ impl Runtime {
         runtime_debug!("Visit unset variable");
         runtime_debug!("name: {}", name);
 
-        self.environment.get_scope().variables.remove(name);
+        self.environment.remove_variable(name);
 
         RunType::Unit.into()
     }
@@ -89,15 +89,18 @@ impl Runtime {
             return RunType::Symbol(name.clone()).into()
         }
 
-        if let Some(mut value) = self.environment.get_scope().variables.get(name).cloned() {
+        if let Some(mut value) = self.environment.get_variable(name).cloned() {
             runtime_debug!("value of variable: {:?}", value);
-            self.get_reactive_value(&mut value); 
-            return value;
+            if !self.in_func_call {
+                self.get_reactive_value(&mut value); 
+            }
+            value
         } else {
             RunType::Symbol(name.clone()).into()
         }
     }
 
+    // TODO: Currently only (-) unary
     fn visit_unary_operation(&mut self, expr: &Expr) -> RunVal {
         runtime_debug!("Visit unary operation");
         runtime_debug!("expr: {:?}", expr);
@@ -170,10 +173,7 @@ impl Runtime {
 
         runtime_debug!("\n\tholder: {:?}\n\tvalue: {:?}", holder, value);
 
-        self.environment
-            .get_scope()
-            .variables
-            .insert(holder.clone(), value.clone());
+        self.environment.set_variable(holder, value.clone());
 
         value
     }
@@ -205,6 +205,14 @@ impl Runtime {
         runtime_debug!("func_name: {}", name);
         runtime_debug!("func_args: {:?}", arguments);
 
+        if let Some(intrinsic) = self.environment.get_intrinsic(name).cloned() {
+            let prev_assign = self.assign;
+            self.assign = false;
+            let args: Vec<RunVal> = arguments.iter().map(|it| self.visit_expr(it)).collect();
+            self.assign = prev_assign;
+            return intrinsic(&args);
+        }
+
         let Some(Function { name: _, params, body }) = self.environment.get_function(name).cloned() else {
             let mut vec = Vec::new();
             for argument in arguments {
@@ -214,6 +222,8 @@ impl Runtime {
             return RunVal::new(RunType::Function(name.clone(), vec));
         };
 
+
+        // TODO: Make this better? Utilise environment.set_variable?
         let mut new_scope = Scope::default();
 
         for (arg_value, param) in arguments.iter().zip(params) {
@@ -226,8 +236,14 @@ impl Runtime {
 
         self.environment.push_scope(new_scope);
 
+        let prev_assign = self.assign;
         self.assign = false;
+
+        self.in_func_call = true;
         let value = self.visit_expr(&body);
+        self.in_func_call = false;
+
+        self.assign = prev_assign;
 
         // Reset the scope again???
         self.environment.pop_scope();
@@ -239,10 +255,21 @@ impl Runtime {
 impl Runtime {
     fn get_reactive_value(&mut self, value: &mut RunVal) {
         use RunType::*; 
+        runtime_debug!("value reactive: {:?}", value);
+        value.simplified = false;
+
         match &mut value.typ {
             Symbol(sym) => {
-                if let Some(mut variable_value) = self.environment.get_scope().variables.get(sym).cloned() {
-                    self.get_reactive_value(&mut variable_value);
+                if let Some(mut variable_value) = self.environment.get_variable(sym).cloned() {
+                    runtime_debug!("variable_value: {:?}", variable_value);
+                    if let RunType::Symbol(replaced_symbol) = &variable_value.typ {
+                        if sym == replaced_symbol {
+                            return;
+                        }
+                    }
+                    if false {
+                        self.get_reactive_value(&mut variable_value);
+                    }
                     *value = variable_value;
                 }
             }
@@ -309,9 +336,6 @@ impl Visitor<RunVal> for Runtime {
             Expr::FunctionCall { name, args } => self.visit_function_call(name, args),
         };
         value.simplify();
-        return value;
+        value
     }
-
-
-
 }

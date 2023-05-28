@@ -2,7 +2,7 @@
 mod app;
 
 #[cfg(not(target_arch = "wasm32"))]
-use app::app::MatexApp;
+use app::gui_app::MatexApp;
 
 #[cfg(not(target_arch = "wasm32"))]
 fn main() -> Result<(), eframe::Error> {
@@ -11,7 +11,7 @@ fn main() -> Result<(), eframe::Error> {
     eframe::run_native(
         "Matex",
         native_options,
-        Box::new(|_cc| Box::new(MatexApp::default())),
+        Box::new(|_cc| Box::<MatexApp>::default()),
     )?;
 
     Ok(())

@@ -18,7 +18,7 @@ impl Inspector {
                 .spacing(egui::vec2(0.0, 4.0))
                 .striped(true)
                 .show(ui, |ui| {
-                    for (_, value) in functions {
+                    for value in functions.values() {
                         let Function { name, params, body } = value;
                         let params_string = params
                             .iter()

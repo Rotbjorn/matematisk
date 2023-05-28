@@ -40,7 +40,7 @@ impl Default for MatexApp {
     fn default() -> Self {
         Self {
             state: State {
-                pane: ActivePane::REPL,
+                pane: ActivePane::Repl,
             },
             source: "".to_owned(),
             executed: Vec::new(),
@@ -51,7 +51,7 @@ impl Default for MatexApp {
 
 #[derive(PartialEq)]
 enum ActivePane {
-    REPL,
+    Repl,
     Example,
 }
 
@@ -64,12 +64,12 @@ impl App for MatexApp {
 
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.horizontal(|ui| {
-                ui.selectable_value(&mut self.state.pane, ActivePane::REPL,  RichText::new("REPL").heading());
+                ui.selectable_value(&mut self.state.pane, ActivePane::Repl,  RichText::new("REPL").heading());
                 ui.selectable_value(&mut self.state.pane, ActivePane::Example,  RichText::new("Example").heading());
             });
 
             match self.state.pane {
-                ActivePane::REPL => {
+                ActivePane::Repl => {
                     self.render_executions(ui);
 
                     TextEdit::multiline(&mut self.source)
@@ -113,7 +113,7 @@ Tänker att nästa steg är bättre förenkling + ekvationslösning samt reaktiv
     }
 }
 
-const EXAMPLE_CODE: &'static str = r"add(x: r, y: hund) = x + y
+const EXAMPLE_CODE: &str = r"add(x: r, y: hund) = x + y
 a = add(2, 3)
 b = add(c, d)
 
