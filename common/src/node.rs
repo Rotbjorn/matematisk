@@ -19,7 +19,7 @@ pub enum Expr {
     Number(f64),
     Variable(String),
 
-    List(Vec<Expr>),
+    Vector(Vec<Expr>),
 
     // Currently only negation unary (-expr)
     Unary(Box<Expr>),
@@ -203,7 +203,7 @@ impl<'a, W: Write> Visitor<Result<u32, Error>> for ASTGraphGenerator<'a, W> {
     fn visit_expr(&mut self, expr: &Expr) -> Result<u32, Error> {
         let current = self.count;
         match expr {
-            Expr::List(v) => {
+            Expr::Vector(v) => {
                 self.create_node("<>")?;
 
                 for (index, node) in v.iter().enumerate() {
