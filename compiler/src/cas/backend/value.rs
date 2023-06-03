@@ -35,8 +35,8 @@ pub enum RunType {
     // TODO: Add complex, real, etc
     Number(f64),
     Symbol(String),
-
     Bool(bool),
+    Vector(Vec<RunVal>),
 
     Sum(Terms),
     Product(Factors),
@@ -120,10 +120,22 @@ impl RunVal {
             | (s@Function(_, _), o@Function(_, _)) => {
                 RunType::Sum(Terms(Vec::from([s.into(), o.into()])))
             }
+            (Number(_), Vector(_)) => todo!(),
+            (Symbol(_), Vector(_)) => todo!(),
+            (Vector(_), Number(_)) => todo!(),
+            (Vector(_), Symbol(_)) => todo!(),
+            (Vector(_), Vector(_)) => todo!(),
+            (Vector(_), Product(_)) => todo!(),
+            (Vector(_), Exponent(_, _)) => todo!(),
+            (Vector(_), Function(_, _)) => todo!(),
+            (Product(_), Vector(_)) => todo!(),
+            (Exponent(_, _), Vector(_)) => todo!(),
+            (Function(_, _), Vector(_)) => todo!(),
         };
 
          RunVal::new(typ)
     }
+    
     pub(crate) fn multiply(self, other: RunVal) -> RunVal {
         value_debug!("multiply: {:?} * {:?}", self, other);
         use RunType::*;
@@ -176,6 +188,18 @@ impl RunVal {
             | (s@Function(_, _), o@Function(_, _)) => {
                 RunType::Product(Factors(Vec::from([s.into(), o.into()])))
             }
+
+            (Number(_), Vector(_)) => todo!(),
+            (Symbol(_), Vector(_)) => todo!(),
+            (Vector(_), Number(_)) => todo!(),
+            (Vector(_), Symbol(_)) => todo!(),
+            (Vector(_), Vector(_)) => todo!(),
+            (Vector(_), Sum(_)) => todo!(),
+            (Vector(_), Exponent(_, _)) => todo!(),
+            (Vector(_), Function(_, _)) => todo!(),
+            (Sum(_), Vector(_)) => todo!(),
+            (Exponent(_, _), Vector(_)) => todo!(),
+            (Function(_, _), Vector(_)) => todo!(),
         };
 
         RunVal::new(typ)
@@ -231,7 +255,22 @@ impl RunVal {
             | (s@Function(_, _), o@Sum(_)) 
             | (s@Function(_, _), o@Product(_)) 
             | (s@Function(_, _), o@Exponent(_, _)) 
-            | (s@Function(_, _), o@Function(_, _)) => Exponent(Box::new(s.into()), Box::new(o.into())).into()
+            | (s@Function(_, _), o@Function(_, _)) => Exponent(Box::new(s.into()), Box::new(o.into())).into(),
+
+
+            (Number(_), Vector(_)) => todo!(),
+            (Symbol(_), Vector(_)) => todo!(),
+            (Vector(_), Number(_)) => todo!(),
+            (Vector(_), Symbol(_)) => todo!(),
+            (Vector(_), Vector(_)) => todo!(),
+            (Vector(_), Sum(_)) => todo!(),
+            (Vector(_), Product(_)) => todo!(),
+            (Vector(_), Exponent(_, _)) => todo!(),
+            (Vector(_), Function(_, _)) => todo!(),
+            (Sum(_), Vector(_)) => todo!(),
+            (Product(_), Vector(_)) => todo!(),
+            (Exponent(_, _), Vector(_)) => todo!(),
+            (Function(_, _), Vector(_)) => todo!(),
         }
     }
     pub(crate) fn less(self, other: RunVal) -> RunVal {
@@ -529,7 +568,8 @@ impl RunVal {
             | Undefined
             | Number(_) 
             | Symbol(_) 
-            | Bool(_) 
+            | Bool(_)
+            | Vector(_)
             | Product(_) 
             | Exponent(_, _) 
             | Function(_, _) => {}
@@ -665,7 +705,7 @@ impl RunVal {
             }
             Exponent(base, _) => RunVal::value_is_negative(&base.typ),
             
-            Unit | Undefined | Sum(_) | Function(_, _) | Symbol(_) | Bool(_) => false,
+            Unit | Undefined | Vector(_) | Sum(_) | Function(_, _) | Symbol(_) | Bool(_) => false,
         };
 
         value_debug!("is negative: {}", is_negative);
@@ -708,6 +748,7 @@ impl fmt::Debug for RunType {
             RunType::Number(n) => write!(f, "{}", n),
             RunType::Symbol(s) => write!(f, "'{}'", s),
             RunType::Bool(b) => write!(f, "{}", b),
+            RunType::Vector(vec) => write!(f, "{:?}", vec),
             RunType::Sum(Terms(terms)) => {
                 write!(f, "(+, ")?;
                 let mut vec = Vec::<String>::new();

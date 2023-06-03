@@ -81,6 +81,15 @@ impl Runtime {
         RunType::Unit.into()
     }
 
+    fn visit_vector(&mut self, vec: &Vec<Expr>) -> RunVal {
+        runtime_debug!("Visit vector");
+        runtime_debug!("vec: {:?}", vec);
+
+        let values = vec.iter().map(|it| self.visit_expr(it)).collect();
+        let value = RunVal::new(RunType::Vector(values));
+
+        value
+    }
     fn visit_variable(&mut self, name: &String) -> RunVal {
         runtime_debug!("Visit variable");
         runtime_debug!("name: {}", name);
@@ -289,7 +298,8 @@ impl Runtime {
             Unit 
             | Undefined 
             | Number(_) 
-            | Bool(_) => {}
+            | Bool(_) 
+            | Vector(_) => {}
         }
     }
 }
@@ -313,7 +323,7 @@ impl Visitor<RunVal> for Runtime {
         let mut value = match expr {
             Expr::Number(n) => RunType::Number(*n).into(),
             Expr::Variable(name) => self.visit_variable(name),
-            Expr::List(_) => todo!("Not handling List"),
+            Expr::Vector(vec) => self.visit_vector(vec),
             Expr::Unary(expr) => self.visit_unary_operation(expr),
             Expr::Simplify(expr) => {
                 let mut expr = self.visit_expr(expr);

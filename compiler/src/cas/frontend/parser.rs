@@ -215,14 +215,15 @@ impl Parser {
             Keyword(kw) => self.parse_keyword(kw)?,
             Minus => self.parse_unary_minus()?,
             LeftParenthesis => self.parse_grouping()?,
-            LeftSquareBracket => todo!("Implement lists"),
-            RightSquareBracket => todo!("Implement lists"),
+            LeftSquareBracket => self.parse_vector()?,
             RightBrace => todo!("Implement blocks"),
             LeftBrace => todo!("Implement blocks"),
             Plus | Star | Slash | Caret | Equal | EqualEqual | Less | Greater | LessEqual
             | GreaterEqual | Colon | Semicolon | Tilde | Dot | Comma | RightParenthesis
-            | NewLine => panic!("Failed prefix on: {}", token),
+            | NewLine | RightSquareBracket => panic!("Failed prefix on: {}", token),
         };
+
+        
 
         while !self.at_end() && prec <= BinOp::from(&self.get_token()?.typ).precedence() {
             node = match self.get_token()?.typ {
@@ -354,6 +355,22 @@ impl Parser {
         let function_call = Expr::FunctionCall { name: id, args };
         parser_debug!("Returning {:?}", function_call);
         Ok(function_call)
+    }
+
+    fn parse_vector(&mut self) -> ParseResult<Expr> {
+        self.expect(TokenType::LeftSquareBracket, "Expected opening square bracket for vector")?;
+
+        let expression = self.parse_expression()?;
+        let mut expressions: Vec<Expr> = Vec::from([expression]);
+        
+        while self.get_token()?.typ == TokenType::Comma {
+            self.consume()?;
+            expressions.push(self.parse_expression()?);
+        }
+
+        self.expect(TokenType::RightSquareBracket, "Expected closing square bracket for vector")?;
+
+        Ok(Expr::Vector(expressions))
     }
 
     fn parse_grouping(&mut self) -> ParseResult<Expr> {
