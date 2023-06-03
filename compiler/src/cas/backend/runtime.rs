@@ -5,7 +5,7 @@ use matex_common::node::Visitor;
 
 use log::{debug, error};
 
-use crate::cas::backend::value::{Terms, Factors};
+use crate::cas::backend::value::{Factors, Terms};
 
 use super::environment::{Environment, Scope};
 use super::value::{RunType, RunVal};
@@ -95,13 +95,13 @@ impl Runtime {
         runtime_debug!("name: {}", name);
 
         if self.assign {
-            return RunType::Symbol(name.clone()).into()
+            return RunType::Symbol(name.clone()).into();
         }
 
         if let Some(mut value) = self.environment.get_variable(name).cloned() {
             runtime_debug!("value of variable: {:?}", value);
             if !self.in_func_call {
-                self.get_reactive_value(&mut value); 
+                self.get_reactive_value(&mut value);
             }
             value
         } else {
@@ -121,12 +121,7 @@ impl Runtime {
         value
     }
 
-    fn visit_binary_operation(
-        &mut self,
-        left: &Expr,
-        operation: &BinOp,
-        right: &Expr,
-    ) -> RunVal {
+    fn visit_binary_operation(&mut self, left: &Expr, operation: &BinOp, right: &Expr) -> RunVal {
         runtime_debug!("Visit binary operation");
         runtime_debug!("left: {:?}", left);
         runtime_debug!("operation: {:?}", operation);
@@ -227,10 +222,9 @@ impl Runtime {
             for argument in arguments {
                 let value = self.visit_expr(argument);
                 vec.push(value);
-            } 
+            }
             return RunVal::new(RunType::Function(name.clone(), vec));
         };
-
 
         // TODO: Make this better? Utilise environment.set_variable?
         let mut new_scope = Scope::default();
@@ -263,7 +257,7 @@ impl Runtime {
 
 impl Runtime {
     fn get_reactive_value(&mut self, value: &mut RunVal) {
-        use RunType::*; 
+        use RunType::*;
         runtime_debug!("value reactive: {:?}", value);
         value.simplified = false;
 
@@ -283,8 +277,7 @@ impl Runtime {
                 }
             }
 
-            Product(Factors(vec)) 
-            | Sum(Terms(vec)) => {
+            Product(Factors(vec)) | Sum(Terms(vec)) => {
                 for item in vec {
                     self.get_reactive_value(item);
                 }
@@ -295,11 +288,7 @@ impl Runtime {
             }
             Function(_, _) => todo!(),
 
-            Unit 
-            | Undefined 
-            | Number(_) 
-            | Bool(_) 
-            | Vector(_) => {}
+            Unit | Undefined | Number(_) | Bool(_) | Vector(_) => {}
         }
     }
 }

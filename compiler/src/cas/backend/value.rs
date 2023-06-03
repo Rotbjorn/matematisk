@@ -1,10 +1,13 @@
-use std::{cmp::Ordering, fmt::{Debug, self}};
+use std::{
+    cmp::Ordering,
+    fmt::{self, Debug},
+};
 
 #[cfg(target_arch = "wasm32")]
 use serde::{Deserialize, Serialize};
 
-use log::{debug, error};
 use super::format::ValueFormatter;
+use log::{debug, error};
 
 macro_rules! value_debug {
     ($($arg:tt)+) => (debug!(target: "matex::value", "[{}:{}] {}", file!(), line!(), &format!($($arg)+)));
@@ -14,7 +17,6 @@ macro_rules! value_debug {
 macro_rules! value_error {
     ($($arg:tt)+) => (error!(target: "matex::value", $($arg)+));
 }
-
 
 #[derive(Clone, PartialEq)]
 #[cfg_attr(target_arch = "wasm32", derive(Serialize, Deserialize))]
@@ -42,9 +44,8 @@ pub enum RunType {
     Product(Factors),
     Exponent(Box<RunVal>, Box<RunVal>),
 
-    Function(String, Vec<RunVal>)
+    Function(String, Vec<RunVal>),
 }
-
 
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(target_arch = "wasm32", derive(Serialize, Deserialize))]
@@ -59,7 +60,7 @@ impl RunVal {
         T::format(self);
     }
 
-    pub(crate) fn new(typ: RunType) -> Self{
+    pub(crate) fn new(typ: RunType) -> Self {
         Self {
             simplified: false,
             typ,
@@ -72,8 +73,7 @@ impl RunVal {
         use RunType::*;
 
         let typ = match (self.typ, other.typ) {
-            (Unit, _) | (_, Unit)
-            | (Undefined, _) | (_, Undefined) => Undefined,
+            (Unit, _) | (_, Unit) | (Undefined, _) | (_, Undefined) => Undefined,
 
             (Bool(_), _) | (_, Bool(_)) => panic!("No addition with booleans"),
 
@@ -94,30 +94,30 @@ impl RunVal {
                 Sum(Terms(v))
             }
 
-            (s@Number(_), o@Symbol(_))
-            | (s@Number(_), o@Product(_))
-            | (s@Number(_), o@Exponent(_, _))
-            | (s@Number(_), o@Function(_, _))
-            | (s@Symbol(_), o@Number(_))
-            | (s@Symbol(_), o@Symbol(_))
-            | (s@Symbol(_), o@Product(_))
-            | (s@Symbol(_), o@Exponent(_, _))
-            | (s@Symbol(_), o@Function(_, _)) 
-            | (s@Product(_), o@Number(_))
-            | (s@Product(_), o@Symbol(_))
-            | (s@Product(_), o@Product(_))
-            | (s@Product(_), o@Exponent(_, _))
-            | (s@Product(_), o@Function(_, _)) 
-            | (s@Exponent(_, _), o@Number(_))
-            | (s@Exponent(_, _), o@Symbol(_))
-            | (s@Exponent(_, _), o@Product(_))
-            | (s@Exponent(_, _), o@Exponent(_, _))
-            | (s@Exponent(_, _), o@Function(_, _)) 
-            | (s@Function(_, _), o@Number(_)) 
-            | (s@Function(_, _), o@Symbol(_)) 
-            | (s@Function(_, _), o@Product(_))
-            | (s@Function(_, _), o@Exponent(_, _))
-            | (s@Function(_, _), o@Function(_, _)) => {
+            (s @ Number(_), o @ Symbol(_))
+            | (s @ Number(_), o @ Product(_))
+            | (s @ Number(_), o @ Exponent(_, _))
+            | (s @ Number(_), o @ Function(_, _))
+            | (s @ Symbol(_), o @ Number(_))
+            | (s @ Symbol(_), o @ Symbol(_))
+            | (s @ Symbol(_), o @ Product(_))
+            | (s @ Symbol(_), o @ Exponent(_, _))
+            | (s @ Symbol(_), o @ Function(_, _))
+            | (s @ Product(_), o @ Number(_))
+            | (s @ Product(_), o @ Symbol(_))
+            | (s @ Product(_), o @ Product(_))
+            | (s @ Product(_), o @ Exponent(_, _))
+            | (s @ Product(_), o @ Function(_, _))
+            | (s @ Exponent(_, _), o @ Number(_))
+            | (s @ Exponent(_, _), o @ Symbol(_))
+            | (s @ Exponent(_, _), o @ Product(_))
+            | (s @ Exponent(_, _), o @ Exponent(_, _))
+            | (s @ Exponent(_, _), o @ Function(_, _))
+            | (s @ Function(_, _), o @ Number(_))
+            | (s @ Function(_, _), o @ Symbol(_))
+            | (s @ Function(_, _), o @ Product(_))
+            | (s @ Function(_, _), o @ Exponent(_, _))
+            | (s @ Function(_, _), o @ Function(_, _)) => {
                 RunType::Sum(Terms(Vec::from([s.into(), o.into()])))
             }
             (Number(_), Vector(_)) => todo!(),
@@ -133,15 +133,14 @@ impl RunVal {
             (Function(_, _), Vector(_)) => todo!(),
         };
 
-         RunVal::new(typ)
+        RunVal::new(typ)
     }
-    
+
     pub(crate) fn multiply(self, other: RunVal) -> RunVal {
         value_debug!("multiply: {:?} * {:?}", self, other);
         use RunType::*;
         let typ = match (self.typ, other.typ) {
-            (Unit, _) | (_, Unit) 
-            | (Undefined, _) | (_, Undefined)=> Undefined,
+            (Unit, _) | (_, Unit) | (Undefined, _) | (_, Undefined) => Undefined,
 
             (Bool(_), _) | (_, Bool(_)) => panic!("No multiplication with booleans"),
 
@@ -162,30 +161,30 @@ impl RunVal {
                 Product(Factors(v))
             }
 
-            (s@Number(_), o@Symbol(_))
-            | (s@Number(_), o@Sum(_))
-            | (s@Number(_), o@Exponent(_, _))
-            | (s@Number(_), o@Function(_, _))
-            | (s@Symbol(_), o@Number(_))
-            | (s@Symbol(_), o@Symbol(_))
-            | (s@Symbol(_), o@Sum(_))
-            | (s@Symbol(_), o@Exponent(_, _))
-            | (s@Symbol(_), o@Function(_, _))
-            | (s@Sum(_), o@Number(_))
-            | (s@Sum(_), o@Symbol(_))
-            | (s@Sum(_), o@Sum(_))
-            | (s@Sum(_), o@Exponent(_, _))
-            | (s@Sum(_), o@Function(_, _)) 
-            | (s@Exponent(_, _), o@Number(_))
-            | (s@Exponent(_, _), o@Symbol(_))
-            | (s@Exponent(_, _), o@Sum(_))
-            | (s@Exponent(_, _), o@Exponent(_, _))
-            | (s@Exponent(_, _), o@Function(_, _))
-            | (s@Function(_, _), o@Number(_))
-            | (s@Function(_, _), o@Symbol(_))
-            | (s@Function(_, _), o@Sum(_))
-            | (s@Function(_, _), o@Exponent(_, _))
-            | (s@Function(_, _), o@Function(_, _)) => {
+            (s @ Number(_), o @ Symbol(_))
+            | (s @ Number(_), o @ Sum(_))
+            | (s @ Number(_), o @ Exponent(_, _))
+            | (s @ Number(_), o @ Function(_, _))
+            | (s @ Symbol(_), o @ Number(_))
+            | (s @ Symbol(_), o @ Symbol(_))
+            | (s @ Symbol(_), o @ Sum(_))
+            | (s @ Symbol(_), o @ Exponent(_, _))
+            | (s @ Symbol(_), o @ Function(_, _))
+            | (s @ Sum(_), o @ Number(_))
+            | (s @ Sum(_), o @ Symbol(_))
+            | (s @ Sum(_), o @ Sum(_))
+            | (s @ Sum(_), o @ Exponent(_, _))
+            | (s @ Sum(_), o @ Function(_, _))
+            | (s @ Exponent(_, _), o @ Number(_))
+            | (s @ Exponent(_, _), o @ Symbol(_))
+            | (s @ Exponent(_, _), o @ Sum(_))
+            | (s @ Exponent(_, _), o @ Exponent(_, _))
+            | (s @ Exponent(_, _), o @ Function(_, _))
+            | (s @ Function(_, _), o @ Number(_))
+            | (s @ Function(_, _), o @ Symbol(_))
+            | (s @ Function(_, _), o @ Sum(_))
+            | (s @ Function(_, _), o @ Exponent(_, _))
+            | (s @ Function(_, _), o @ Function(_, _)) => {
                 RunType::Product(Factors(Vec::from([s.into(), o.into()])))
             }
 
@@ -208,55 +207,53 @@ impl RunVal {
         value_debug!("power: {:?} ^ {:?}", self, other);
         use RunType::*;
         match (self.typ, other.typ) {
-            (Unit, _) | (_, Unit)
-            | (Undefined, _) | (_, Undefined) => Undefined.into(),
+            (Unit, _) | (_, Unit) | (Undefined, _) | (_, Undefined) => Undefined.into(),
 
             (Bool(_), _) | (_, Bool(_)) => panic!("No powering with booleans"),
 
             // TODO: Calculate directly or keep as exponent?
             (Number(lhs), Number(rhs)) => Number(lhs.powf(rhs)).into(),
             // (s@Number(_), o@Number(_)) => Exponent(Box::new(s.into()), Box::new(o.into())).into(),
-
-
-            (Exponent(base, exp), o@Number(_))
-            | (Exponent(base, exp), o@Symbol(_))
-            | (Exponent(base, exp), o@Sum(_))
-            | (Exponent(base, exp), o@Product(_))
-            | (Exponent(base, exp), o@Exponent(_, _))
-            | (Exponent(base, exp), o@Function(_, _)) => {
+            (Exponent(base, exp), o @ Number(_))
+            | (Exponent(base, exp), o @ Symbol(_))
+            | (Exponent(base, exp), o @ Sum(_))
+            | (Exponent(base, exp), o @ Product(_))
+            | (Exponent(base, exp), o @ Exponent(_, _))
+            | (Exponent(base, exp), o @ Function(_, _)) => {
                 Exponent(base, Box::new(exp.multiply(o.into()))).into()
             }
 
-            (s@Number(_), o@Symbol(_))
-            | (s@Number(_), o@Sum(_))
-            | (s@Number(_), o@Product(_))
-            | (s@Number(_), o@Exponent(_, _))
-            | (s@Number(_), o@Function(_, _)) 
-            | (s@Symbol(_), o@Number(_))
-            | (s@Symbol(_), o@Symbol(_))
-            | (s@Symbol(_), o@Sum(_))
-            | (s@Symbol(_), o@Product(_))
-            | (s@Symbol(_), o@Exponent(_, _))
-            | (s@Symbol(_), o@Function(_, _)) 
-            | (s@Sum(_), o@Number(_))
-            | (s@Sum(_), o@Symbol(_))
-            | (s@Sum(_), o@Sum(_))
-            | (s@Sum(_), o@Product(_))
-            | (s@Sum(_), o@Exponent(_, _))
-            | (s@Sum(_), o@Function(_, _)) 
-            | (s@Product(_), o@Number(_))
-            | (s@Product(_), o@Symbol(_))
-            | (s@Product(_), o@Sum(_))
-            | (s@Product(_), o@Product(_))
-            | (s@Product(_), o@Exponent(_, _))
-            | (s@Product(_), o@Function(_, _)) 
-            | (s@Function(_, _), o@Number(_)) 
-            | (s@Function(_, _), o@Symbol(_)) 
-            | (s@Function(_, _), o@Sum(_)) 
-            | (s@Function(_, _), o@Product(_)) 
-            | (s@Function(_, _), o@Exponent(_, _)) 
-            | (s@Function(_, _), o@Function(_, _)) => Exponent(Box::new(s.into()), Box::new(o.into())).into(),
-
+            (s @ Number(_), o @ Symbol(_))
+            | (s @ Number(_), o @ Sum(_))
+            | (s @ Number(_), o @ Product(_))
+            | (s @ Number(_), o @ Exponent(_, _))
+            | (s @ Number(_), o @ Function(_, _))
+            | (s @ Symbol(_), o @ Number(_))
+            | (s @ Symbol(_), o @ Symbol(_))
+            | (s @ Symbol(_), o @ Sum(_))
+            | (s @ Symbol(_), o @ Product(_))
+            | (s @ Symbol(_), o @ Exponent(_, _))
+            | (s @ Symbol(_), o @ Function(_, _))
+            | (s @ Sum(_), o @ Number(_))
+            | (s @ Sum(_), o @ Symbol(_))
+            | (s @ Sum(_), o @ Sum(_))
+            | (s @ Sum(_), o @ Product(_))
+            | (s @ Sum(_), o @ Exponent(_, _))
+            | (s @ Sum(_), o @ Function(_, _))
+            | (s @ Product(_), o @ Number(_))
+            | (s @ Product(_), o @ Symbol(_))
+            | (s @ Product(_), o @ Sum(_))
+            | (s @ Product(_), o @ Product(_))
+            | (s @ Product(_), o @ Exponent(_, _))
+            | (s @ Product(_), o @ Function(_, _))
+            | (s @ Function(_, _), o @ Number(_))
+            | (s @ Function(_, _), o @ Symbol(_))
+            | (s @ Function(_, _), o @ Sum(_))
+            | (s @ Function(_, _), o @ Product(_))
+            | (s @ Function(_, _), o @ Exponent(_, _))
+            | (s @ Function(_, _), o @ Function(_, _)) => {
+                Exponent(Box::new(s.into()), Box::new(o.into())).into()
+            }
 
             (Number(_), Vector(_)) => todo!(),
             (Symbol(_), Vector(_)) => todo!(),
@@ -344,7 +341,6 @@ impl RunVal {
                 RunVal::combine_integers(terms);
 
                 //RunVal::rearrange(terms);
-
             }
             Product(factors) => {
                 value_debug!("simplify product");
@@ -371,11 +367,11 @@ impl RunVal {
                 base.simplify();
                 exp.simplify();
 
-
                 // Merge exponents, e.g. (e^a)^b => e^(ab)
                 // TODO: Move to its own function?
                 if let Exponent(b_base, b_exp) = base.typ.clone() {
-                    let mut exponents: Box<RunVal> = Box::new(RunType::Product(Factors(Vec::new())).into());
+                    let mut exponents: Box<RunVal> =
+                        Box::new(RunType::Product(Factors(Vec::new())).into());
                     exponents = Box::new(exponents.multiply(*b_exp));
                     exponents = Box::new(exponents.multiply(*exp.clone()));
                     *base = b_base;
@@ -396,7 +392,7 @@ impl RunVal {
             value_debug!("returning; only one item, nothing to combine.");
             return;
         }
-        
+
         // Extract the coefficients from each term
         let mut term_coefficients = RunVal::extract_coefficients(terms);
 
@@ -424,9 +420,10 @@ impl RunVal {
                 new_terms = new_terms.add(term);
             } else if coefficient_total != 0.0 {
                 let mut term: RunVal =
-                    RunType::Product(Factors(Vec::from([Number(coefficient_total).into(), term]))).into();
-                    
-                term.simplify();                
+                    RunType::Product(Factors(Vec::from([Number(coefficient_total).into(), term])))
+                        .into();
+
+                term.simplify();
 
                 if coefficient_total.is_sign_positive() {
                     new_terms = new_terms.add(term);
@@ -475,20 +472,20 @@ impl RunVal {
             let mut i = 0;
             while i < factors_vec.len() {
                 value_debug!("exponents: {:?}", exponents);
-                let other_factor = &factors_vec[i];                
+                let other_factor = &factors_vec[i];
 
                 if base.struct_equal(other_factor) {
                     found = true;
                     exponents = exponents.add(Number(1.0).into());
                     factors_vec.remove(i);
-                    continue
+                    continue;
                 } else if let Exponent(other_base, other_exp) = &other_factor.typ {
                     if base.struct_equal(other_base) {
                         found = true;
                         // TODO: Take ownership instead?
                         exponents = exponents.add(*other_exp.clone());
                         factors_vec.remove(i);
-                        continue
+                        continue;
                     }
                 }
                 i += 1;
@@ -511,7 +508,7 @@ impl RunVal {
                     new_factors.push(exponent.into());
                 }
             } else {
-                new_factors.push(base); 
+                new_factors.push(base);
             }
         }
         *factors_vec = new_factors;
@@ -550,14 +547,16 @@ impl RunVal {
                     dbg!(&a);
                     dbg!(&b);
                     match (&a.typ, &b.typ) {
-                        (_, o@Number(_))|(_, o@Product(_)) => {
+                        (_, o @ Number(_)) | (_, o @ Product(_)) => {
                             if RunVal::value_is_negative(o) {
                                 Ordering::Less
                             } else {
                                 Ordering::Greater
                             }
                         }
-                        (s@Number(_), _) | (s@Product(_), _) if RunVal::value_is_negative(s) => {
+                        (s @ Number(_), _) | (s @ Product(_), _)
+                            if RunVal::value_is_negative(s) =>
+                        {
                             Ordering::Greater
                         }
                         (_, _) => Ordering::Less,
@@ -566,12 +565,12 @@ impl RunVal {
             }
             Unit
             | Undefined
-            | Number(_) 
-            | Symbol(_) 
+            | Number(_)
+            | Symbol(_)
             | Bool(_)
             | Vector(_)
-            | Product(_) 
-            | Exponent(_, _) 
+            | Product(_)
+            | Exponent(_, _)
             | Function(_, _) => {}
         }
     }
@@ -579,13 +578,10 @@ impl RunVal {
     pub(crate) fn flatten(&mut self) {
         use RunType::*;
         match &mut self.typ {
-            Sum(Terms(v)) 
-            | Product(Factors(v)) 
-            if v.len() == 1 => {
+            Sum(Terms(v)) | Product(Factors(v)) if v.len() == 1 => {
                 let value = &mut v[0];
                 value.flatten();
                 *self = value.clone();
-            
             }
             _ => {}
         }
@@ -704,12 +700,12 @@ impl RunVal {
                 is_negative
             }
             Exponent(base, _) => RunVal::value_is_negative(&base.typ),
-            
+
             Unit | Undefined | Vector(_) | Sum(_) | Function(_, _) | Symbol(_) | Bool(_) => false,
         };
 
         value_debug!("is negative: {}", is_negative);
-        
+
         is_negative
     }
 }
@@ -717,11 +713,11 @@ impl RunVal {
 impl fmt::Debug for RunVal {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self.typ {
-            RunType::Unit 
-            | RunType::Undefined 
-            | RunType::Number(_) 
-            | RunType::Symbol(_) 
-            | RunType::Bool(_) 
+            RunType::Unit
+            | RunType::Undefined
+            | RunType::Number(_)
+            | RunType::Symbol(_)
+            | RunType::Bool(_)
             | RunType::Function(_, _) => write!(f, "{:?}", self.typ),
             _ => {
                 if self.simplified {
@@ -761,7 +757,7 @@ impl fmt::Debug for RunType {
                 f.write_str(&str)?;
 
                 write!(f, ")")
-            },
+            }
 
             RunType::Product(Factors(factors)) => {
                 write!(f, "(*, ")?;
@@ -775,15 +771,15 @@ impl fmt::Debug for RunType {
                 f.write_str(&str)?;
 
                 write!(f, ")")
-            },
+            }
 
             RunType::Exponent(base, exp) => {
                 write!(f, "(^, ({:?}), ({:?}))", base, exp)
-            },
+            }
 
             RunType::Function(name, args) => {
                 write!(f, "{}({:?})", name, args)
-            },
+            }
         }
     }
 }

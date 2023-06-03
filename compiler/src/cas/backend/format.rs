@@ -33,8 +33,8 @@ impl NormalFormatter {
             }
             Bool(b) => format!("{}", b),
             Vector(vec) => {
-
-                let formatted_items = vec.iter()
+                let formatted_items = vec
+                    .iter()
                     .map(|it| Self::format(it))
                     .collect::<Vec<String>>()
                     .join(", ");
@@ -104,7 +104,7 @@ impl NormalFormatter {
 
                 for argument in arguments {
                     let argument_str = Self::format(argument);
-                    args.push(argument_str); 
+                    args.push(argument_str);
                 }
 
                 format!("{}({})", name, args.join(", "))

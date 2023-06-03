@@ -223,8 +223,6 @@ impl Parser {
             | NewLine | RightSquareBracket => panic!("Failed prefix on: {}", token),
         };
 
-        
-
         while !self.at_end() && prec <= BinOp::from(&self.get_token()?.typ).precedence() {
             node = match self.get_token()?.typ {
                 Plus => self.parse_addition(node)?,
@@ -232,7 +230,9 @@ impl Parser {
                 Star => self.parse_multiplication(node)?,
                 Slash => self.parse_division(node)?,
                 Caret => self.parse_power(node)?,
-                EqualEqual | Less | LessEqual | Greater | GreaterEqual => self.parse_comparison(node)?,
+                EqualEqual | Less | LessEqual | Greater | GreaterEqual => {
+                    self.parse_comparison(node)?
+                }
                 Equal => self.parse_assignment(node)?,
                 _ => {
                     // TODO: Support custom infix operators?
@@ -358,17 +358,23 @@ impl Parser {
     }
 
     fn parse_vector(&mut self) -> ParseResult<Expr> {
-        self.expect(TokenType::LeftSquareBracket, "Expected opening square bracket for vector")?;
+        self.expect(
+            TokenType::LeftSquareBracket,
+            "Expected opening square bracket for vector",
+        )?;
 
         let expression = self.parse_expression()?;
         let mut expressions: Vec<Expr> = Vec::from([expression]);
-        
+
         while self.get_token()?.typ == TokenType::Comma {
             self.consume()?;
             expressions.push(self.parse_expression()?);
         }
 
-        self.expect(TokenType::RightSquareBracket, "Expected closing square bracket for vector")?;
+        self.expect(
+            TokenType::RightSquareBracket,
+            "Expected closing square bracket for vector",
+        )?;
 
         Ok(Expr::Vector(expressions))
     }
@@ -415,8 +421,8 @@ impl Parser {
         self.expect(TokenType::Star, "Expected multiplication operator")?;
         let right = self.expect_expression(Precedence::Exponent)?;
         // let Ok(right) = right else {
-            // parser_error!("ERROR: {:?}", right.clone().err().unwrap());
-            // return right;
+        // parser_error!("ERROR: {:?}", right.clone().err().unwrap());
+        // return right;
         // };
         let node = Expr::BinaryOp {
             left: left.into(),
@@ -516,7 +522,9 @@ impl Parser {
     fn expect_expression(&mut self, prec: Precedence) -> ParseResult<Expr> {
         let expr = self.parse_precedence(prec);
         if let Err(ParseError::EndOfStream) = expr {
-            return Err(ParseError::UnexpectedEndOfStream { message: "Expected an expression".to_string() });
+            return Err(ParseError::UnexpectedEndOfStream {
+                message: "Expected an expression".to_string(),
+            });
         }
         expr
     }

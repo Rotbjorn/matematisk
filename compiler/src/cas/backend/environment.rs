@@ -13,7 +13,9 @@ pub struct Environment {
 
 impl Environment {
     pub fn set_variable(&mut self, name: &str, value: RunVal) {
-        self.get_scope_mut().variables.insert(name.to_string(), value);
+        self.get_scope_mut()
+            .variables
+            .insert(name.to_string(), value);
     }
 
     pub fn remove_variable(&mut self, name: &str) {
@@ -21,7 +23,9 @@ impl Environment {
     }
 
     pub fn set_func(&mut self, name: &str, func: Function) {
-        self.get_scope_mut().functions.insert(name.to_string(), func);
+        self.get_scope_mut()
+            .functions
+            .insert(name.to_string(), func);
     }
 
     pub fn remove_func(&mut self, name: &str) {
