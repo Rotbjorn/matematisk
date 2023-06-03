@@ -32,6 +32,15 @@ impl NormalFormatter {
                 }
             }
             Bool(b) => format!("{}", b),
+            Vector(vec) => {
+
+                let formatted_items = vec.iter()
+                    .map(|it| Self::format(it))
+                    .collect::<Vec<String>>()
+                    .join(", ");
+
+                format!("[{}]", formatted_items)
+            }
             Sum(Terms(terms)) => {
                 let mut buffer = String::new();
                 for (i, term) in terms.iter().enumerate() {
