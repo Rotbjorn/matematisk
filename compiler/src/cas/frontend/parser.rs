@@ -614,14 +614,7 @@ impl Parser {
     }
 
     fn token_matches(&mut self, token_type: TokenType) -> bool {
-        let Ok(tok) = self.get_token() else {
-            return false;
-        };
-
-        // TODO: This is a nice function!
-        // self.get_token().is_ok_and(|token| { token.typ == token_type })
-
-        tok.typ == token_type
+        self.get_token().is_ok_and(|token| { token.typ == token_type })
     }
 
     fn get_token(&self) -> ParseResult<Token> {
