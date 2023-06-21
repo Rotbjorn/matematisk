@@ -264,15 +264,9 @@ impl Runtime {
         match &mut value.typ {
             Symbol(sym) => {
                 if let Some(mut variable_value) = self.environment.get_variable(sym).cloned() {
+                    // FIXME: Handle recursive cases
                     runtime_debug!("variable_value: {:?}", variable_value);
-                    if let RunType::Symbol(replaced_symbol) = &variable_value.typ {
-                        if sym == replaced_symbol {
-                            return;
-                        }
-                    }
-                    if false {
-                        self.get_reactive_value(&mut variable_value);
-                    }
+                    self.get_reactive_value(&mut variable_value);
                     *value = variable_value;
                 }
             }
