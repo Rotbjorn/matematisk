@@ -6,8 +6,8 @@ use std::{
 
 use matex_common::node::ASTGraphGenerator;
 use matex_compiler::cas::{
-    backend::runtime::Runtime,
-    frontend::{lexer, parser},
+    eval::runtime::Runtime,
+    syntax::{lexer, parser},
 };
 
 use clap::{Parser, Subcommand};

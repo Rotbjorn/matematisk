@@ -3,11 +3,11 @@ use std::{fs::File, io::Write, str::FromStr};
 use matex_common::node::{ASTGraphGenerator, Program};
 
 use matex_compiler::cas::{
-    backend::{
+    eval::{
         format::{NormalFormatter, ValueFormatter},
         runtime::Runtime,
     },
-    frontend::{lexer, parser},
+    syntax::{lexer, parser},
 };
 use rustyline::error::ReadlineError;
 

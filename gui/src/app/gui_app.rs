@@ -1,11 +1,11 @@
 use eframe::App;
 use egui::{panel::Side, FontId, Label, RichText, TextEdit, Ui};
 use matex_compiler::cas::{
-    backend::{
+    eval::{
         format::{NormalFormatter, ValueFormatter},
         runtime::Runtime,
     },
-    frontend::{lexer::Lexer, parser::Parser},
+    syntax::{lexer::Lexer, parser::Parser},
 };
 
 use super::widgets::inspector::Inspector;
