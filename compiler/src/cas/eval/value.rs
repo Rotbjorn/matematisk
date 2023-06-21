@@ -544,8 +544,6 @@ impl RunVal {
         match &mut self.typ {
             Sum(Terms(terms)) => {
                 terms.sort_by(|a, b| {
-                    dbg!(&a);
-                    dbg!(&b);
                     match (&a.typ, &b.typ) {
                         (_, o @ Number(_)) | (_, o @ Product(_)) => {
                             if RunVal::value_is_negative(o) {
