@@ -6,3 +6,10 @@ members = [
     "compiler",
     "gui",
 ]
+
+[workspace.package]
+authors = ["Rotbjorn"]
+rust-version = "1.70"
+edition = "2021"
+repository = "https://github.com/Rotbjorn/matematisk"
+readme = "README.md"
