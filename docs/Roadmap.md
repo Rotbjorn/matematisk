@@ -5,7 +5,7 @@ the different parts needed for the language to be released as 1.0.
 
 ## Language
 
-- [ ] Define a grammar for the syntax of the language
+- [ ] Define a grammar for the syntax of the language ([EBNF-grammar](./Grammar.ebnf))
 
 ## Compiler
 
