@@ -337,7 +337,6 @@ impl Parser {
             });
         }
 
-        // Create argument vector, and store first argument.
         let mut args: Vec<Expr> = vec![self.parse_expression()?];
 
         // Parse arguments
@@ -434,6 +433,8 @@ impl Parser {
         Ok(node)
     }
 
+
+    // TODO: Merge with parse_multiplication
     fn parse_division(&mut self, left: Expr) -> ParseResult<Expr> {
         parser_debug!("Parsing division");
         self.consume()?;

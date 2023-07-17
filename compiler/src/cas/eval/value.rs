@@ -29,7 +29,6 @@ pub struct RunVal {
 #[cfg_attr(target_arch = "wasm32", derive(Serialize, Deserialize))]
 #[derive(Clone, PartialEq)]
 pub enum RunType {
-    // Merge these two?
     Unit,
 
     Undefined,
@@ -42,6 +41,7 @@ pub enum RunType {
 
     Sum(Terms),
     Product(Factors),
+    
     Exponent(Box<RunVal>, Box<RunVal>),
 
     Function(String, Vec<RunVal>),
