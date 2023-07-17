@@ -1,0 +1,58 @@
+(* The grammar of matematisk, written in Extended Backus-Naur Form    *)
+(* -------------------------------------------------------------------*)
+(* Wikipedia: https://en.wikipedia.org/wiki/Extended_Backus-Naur_form *)
+
+
+(* Terminals *)
+identifier = ? Regex [A-Za-z] ?, { ? Regex [A-Za-z0-9_] ? };
+string = '"', ? UTF-8 Characters ?, '"'';
+newline = "\n";
+
+constant = integer-constant | float-constant;
+integer-constant = [1-9], { [0-9] };
+float-constant = integer-constant, ".", [0-9], { [0-9] };
+
+(* Non-terminals *)
+program = 
+    { declaration };
+
+declaration =
+    ( function-declaration | statement ), newline;
+
+function-declaration = 
+    identifier, "(", parameter-declaration, { parameter-declaration }, ")", 
+    "=", expression, newline;
+
+parameter-declaration = 
+    identifier, [ ":", identifier ];
+
+statement = ( "~", identifier ) | expression;
+
+expression = 
+    assignment-expression 
+    | if-expression;
+
+assignment-expression = equality-expression, [ "=", equality-expression ];
+
+equality-expression = comparison-expression, { ( "==", "!=" ), comparison-expression };
+
+comparison-expression = 
+    addition-expression, { comparison-operator, addition-expression };
+
+comparison-operators = "<" | "<=" | "=>" | ">";
+
+term-expression = 
+    multiplication-expression, { ( "+" | "-" ), multiplication-expression };
+
+factor-expression = 
+    primary-expression, { ( "*" | "/" ), primary-expression };
+
+primary-expression =
+    identifier
+    | constant
+    | array
+    | "(", expression, ")";
+
+array = "[", { expression }, "]";
+
+if-expression = "if", expression, "then", expression, "else", expression;
